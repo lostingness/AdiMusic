@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 9185f26..1e51e9c 100644
+index 9185f26..655dc41 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -60,8 +60,8 @@ android {
@@ -8,8 +8,8 @@ index 9185f26..1e51e9c 100644
          targetSdk = 35
 -        versionCode = 24
 -        versionName = "4.2.4"
-+        versionCode = 26
-+        versionName = "4.2.6"
++        versionCode = 27
++        versionName = "4.2.7"
  
          val lastWaveLyricsToken = resolveSecret("LASTWAVE_LYRICS_TOKEN")
          val lastWaveLyricsUrl = resolveSecret("LASTWAVE_LYRICS_URL")
@@ -27,7 +27,7 @@ index 5a54bad..2a99b4d 100644
          private const val LEGACY_PUBLIC_DIR_NAME = "LastWave"
          // 128 KB keeps per-connection buffers out of the large-object heap:
 diff --git a/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt b/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
-index dc1aa93..b36fa4b 100644
+index dc1aa93..e69c2e4 100644
 --- a/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
 +++ b/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
 @@ -56,7 +56,7 @@ enum class LyricsAnimation(val id: String, val title: String, val description: S
@@ -39,6 +39,15 @@ index dc1aa93..b36fa4b 100644
      APPLE_MUSIC("apple_music", "Apple Music", "Syllable-synced Apple Music lyrics first"),
      BETTER_LYRICS("better_lyrics", "BetterLyrics", "Word-synced lyrics first"),
      KUGOU("kugou", "Kugou", "KRC word-synced lyrics first"),
+@@ -81,7 +81,7 @@ data class MiscSettings(
+      *  updating live as that track changes. Falls back to the user's
+      *  regular selected accent whenever nothing is playing or artwork
+      *  colors can't be extracted — see ThemeRepository.updateNowPlayingArtwork. */
+-    val dynamicNowPlayingEnabled: Boolean = false,
++    val dynamicNowPlayingEnabled: Boolean = true,
+     /** "Use Application Font" — on: the bundled Google Sans Flex variable
+      *  font (see ui/theme/Type.kt); off: the device's own system font.
+      *  Defaults on so the app ships with its own identity out of the box. */
 @@ -217,7 +217,7 @@ enum class DownloadFolderStructure(val id: String, val titleRes: Int, val exampl
  }
  
@@ -48,6 +57,43 @@ index dc1aa93..b36fa4b 100644
  
  /** Sanitize a user-entered download folder to a safe single path segment:
   *  no separators, no traversal, max 40 chars, fallback to default. */
+@@ -281,7 +281,7 @@ class SettingsPreferences @Inject constructor(
+         .recoverPreferences("SettingsPreferences")
+         .map { p ->
+             MiscSettings(
+-                dynamicNowPlayingEnabled = p.readSafely(Keys.DYNAMIC_NOW_PLAYING) ?: false,
++                dynamicNowPlayingEnabled = p.readSafely(Keys.DYNAMIC_NOW_PLAYING) ?: true,
+                 useCustomFont = p.readSafely(Keys.USE_CUSTOM_FONT) ?: true,
+                 pinnedFriends = p.readSafely(Keys.PINNED_FRIENDS) ?: emptySet(),
+                 preferLosslessStreaming = p.readSafely(Keys.PREFER_LOSSLESS_STREAMING) ?: true,
+diff --git a/app/src/main/java/com/lastwave/app/data/local/ThemePreferences.kt b/app/src/main/java/com/lastwave/app/data/local/ThemePreferences.kt
+index 9f6ce56..b41a83f 100644
+--- a/app/src/main/java/com/lastwave/app/data/local/ThemePreferences.kt
++++ b/app/src/main/java/com/lastwave/app/data/local/ThemePreferences.kt
+@@ -37,10 +37,10 @@ data class ThemePrefs(
+     val accentColor: String = "#E03030",
+     val accentLight: String = "#FF6060",
+     val accentMode: AccentMode = AccentMode.MANUAL,
+-    val amoled: Boolean = false,
++    val amoled: Boolean = true,
+     /** Experimental iOS-style liquid-glass materials. Off by default — the
+      *  classic opaque look stays untouched until the user opts in. */
+-    val liquidGlass: Boolean = false,
++    val liquidGlass: Boolean = true,
+ )
+ 
+ @Singleton
+@@ -64,8 +64,8 @@ class ThemePreferences @Inject constructor(
+                 accentColor = p.readSafely(Keys.ACCENT_COLOR) ?: "#E03030",
+                 accentLight = p.readSafely(Keys.ACCENT_LIGHT) ?: "#FF6060",
+                 accentMode = AccentMode.fromStorage(p.readSafely(Keys.ACCENT_MODE)),
+-                amoled = p.readSafely(Keys.AMOLED) ?: false,
+-                liquidGlass = p.readSafely(Keys.LIQUID_GLASS) ?: false,
++                amoled = p.readSafely(Keys.AMOLED) ?: true,
++                liquidGlass = p.readSafely(Keys.LIQUID_GLASS) ?: true,
+             )
+         }
+ 
 diff --git a/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt b/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt
 index b6ee317..bcbddd5 100644
 --- a/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt
@@ -226,6 +272,55 @@ index d38df5e..748c1c3 100644
      }
  
      fun isNewerVersion(remote: String, local: String): Boolean {
+diff --git a/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt b/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt
+index 228c198..45ca44f 100644
+--- a/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt
++++ b/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt
+@@ -134,7 +134,7 @@ internal data class PersistedPlaybackSession(
+     val queue: List<PlayableTrack>,
+     val currentIndex: Int,
+     val positionMs: Long,
+-    val sourceLabel: String = "LastWave",
++    val sourceLabel: String = "AdiMusic",
+     val isEndlessQueue: Boolean = false,
+     val shuffleEnabled: Boolean = false,
+     val repeatMode: Int = Player.REPEAT_MODE_OFF,
+@@ -147,7 +147,7 @@ data class MusicPlayerState(
+     val current: PlayableTrack? = null,
+     val queue: List<PlayableTrack> = emptyList(),
+     val currentIndex: Int = -1,
+-    val sourceLabel: String = "LastWave",
++    val sourceLabel: String = "AdiMusic",
+     val isEndlessQueue: Boolean = false,
+     val isPlaying: Boolean = false,
+     val isBuffering: Boolean = false,
+@@ -173,7 +173,7 @@ data class MusicPlayerState(
+  */
+ data class PlaybackChromeState(
+     val current: PlayableTrack? = null,
+-    val sourceLabel: String = "LastWave",
++    val sourceLabel: String = "AdiMusic",
+     val isPlaying: Boolean = false,
+     val isBuffering: Boolean = false,
+     val queueSize: Int = 0,
+@@ -1716,7 +1716,7 @@ class MusicPlayer @Inject constructor(
+ 
+     fun play(
+         track: PlayableTrack,
+-        sourceLabel: String = "LastWave",
++        sourceLabel: String = "AdiMusic",
+         startRadio: Boolean = true,
+     ) {
+         pendingRestoredSession = null
+@@ -1746,7 +1746,7 @@ class MusicPlayer @Inject constructor(
+     fun playQueue(
+         tracks: List<PlayableTrack>,
+         startIndex: Int = 0,
+-        sourceLabel: String = "LastWave",
++        sourceLabel: String = "AdiMusic",
+         startShuffled: Boolean = false,
+     ) {
+         disableRadioQueue()
 diff --git a/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt b/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt
 index 6ff9de6..07760dc 100644
 --- a/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt
@@ -323,10 +418,20 @@ index 0f324cb..1a55d93 100644
  ) {
      fun toPlayable(): PlayableTrack = PlayableTrack(
 diff --git a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
-index 5373fd0..8d0442a 100644
+index 5373fd0..031a6bd 100644
 --- a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
-@@ -610,7 +610,7 @@ private fun LaunchGate() {
+@@ -244,6 +244,9 @@ fun LastWaveNavHost(
+                 onOpenDownloads = {
+                     navController.navigate(Screen.Downloads.route)
+                 },
++                onOpenSpotifyImport = {
++                    navController.navigate(Screen.ExternalPlaylistImport.route)
++                },
+             )
+         }
+ 
+@@ -610,7 +613,7 @@ private fun LaunchGate() {
                  )
              }
              Spacer(Modifier.height(18.dp))
@@ -336,7 +441,7 @@ index 5373fd0..8d0442a 100644
              ExpressiveLoadingIndicator(message = "Preparing your music")
          }
 diff --git a/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt b/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
-index 5443e1f..6d3dcf0 100644
+index 5443e1f..8b0c1c2 100644
 --- a/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
 @@ -2164,7 +2164,7 @@ private fun FullPlayer(
@@ -348,6 +453,74 @@ index 5443e1f..6d3dcf0 100644
                              },
                              style = MaterialTheme.typography.bodySmall,
                              color = Color.White.copy(alpha = 0.70f),
+@@ -2674,6 +2674,22 @@ private fun FullPlayer(
+                                                 ),
+                                                 label = "likeScale",
+                                             )
++                                            // AdiMusic: pop animation on like toggle. The press-scale above
++                                            // alone never fired reliably through the glass surface, so the
++                                            // heart now visibly pops whenever the liked state flips.
++                                            val likePop = remember { Animatable(1f) }
++                                            var likePopInit by remember { mutableStateOf(true) }
++                                            LaunchedEffect(isLiked) {
++                                                if (likePopInit) { likePopInit = false; return@LaunchedEffect }
++                                                likePop.animateTo(1.35f, tween(110))
++                                                likePop.animateTo(
++                                                    1f,
++                                                    spring(
++                                                        dampingRatio = Spring.DampingRatioMediumBouncy,
++                                                        stiffness = Spring.StiffnessMedium,
++                                                    ),
++                                                )
++                                            }
+                                             LiquidGlassSurface(
+                                                 glassModifier = Modifier.liquidGlassChrome(CircleShape, LocalLiquidGlass.current, LiquidGlassPreset.PlayerControls, interactionSource = likeInteraction),
+                                                 onClick = onToggleLiked,
+@@ -2694,8 +2710,9 @@ private fun FullPlayer(
+                                                 modifier = Modifier
+                                                     .size(46.dp)
+                                                     .graphicsLayer {
+-                                                        scaleX = likeScale
+-                                                        scaleY = likeScale
++                                                        val s = likeScale * likePop.value
++                                                        scaleX = s
++                                                        scaleY = s
+                                                     },
+                                             ) {
+                                                 Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+diff --git a/app/src/main/java/com/lastwave/app/ui/playlist/PlaylistScreen.kt b/app/src/main/java/com/lastwave/app/ui/playlist/PlaylistScreen.kt
+index e92ef7b..ca0ad13 100644
+--- a/app/src/main/java/com/lastwave/app/ui/playlist/PlaylistScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/playlist/PlaylistScreen.kt
+@@ -47,6 +47,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
+ import androidx.compose.material.icons.filled.Close
+ import androidx.compose.material.icons.filled.BookmarkAdd
+ import androidx.compose.material.icons.filled.Delete
++import androidx.compose.material.icons.filled.CloudDownload
+ import androidx.compose.material.icons.filled.Download
+ import androidx.compose.material.icons.filled.Edit
+ import androidx.compose.material.icons.filled.Share
+@@ -121,6 +122,7 @@ import java.util.Locale
+ @Composable
+ fun PlaylistScreen(
+     onOpenPlaylist: (Long) -> Unit = {},
++    onOpenSpotifyImport: () -> Unit = {},
+     viewModel: PlaylistViewModel = hiltViewModel(),
+ ) {
+     val state by viewModel.uiState.collectAsStateWithLifecycle()
+@@ -182,6 +184,12 @@ fun PlaylistScreen(
+                             Icon(Icons.Filled.Close, contentDescription = "Clear selection")
+                         }
+                     } else {
++                        IconButton(
++                            onClick = onOpenSpotifyImport,
++                            modifier = Modifier.size(40.dp),
++                        ) {
++                            Icon(Icons.Filled.CloudDownload, contentDescription = "Import from Spotify")
++                        }
+                         IconButton(
+                             onClick = viewModel::openCreateDialog,
+                             modifier = Modifier.size(40.dp),
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt b/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt
 index 30b4e67..2d06759 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt
@@ -375,10 +548,18 @@ index bc0642e..c40de2d 100644
                                  color = MaterialTheme.colorScheme.onSurfaceVariant,
                              )
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
-index 8620614..60deba8 100644
+index 8620614..0f03515 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
-@@ -1305,7 +1305,7 @@ fun SettingsScreen(
+@@ -180,6 +180,7 @@ import com.lastwave.app.data.local.nativeDisplayName
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.text.style.TextDecoration
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import androidx.hilt.navigation.compose.hiltViewModel
+@@ -1305,7 +1306,7 @@ fun SettingsScreen(
                          else ->
                              if (!ytConnected) "Connect an account first"
                              else if (ytSyncEnabled) "Selected playlists mirror to your account, 24/7" + lastSyncSuffix(ytLastSyncAt)
@@ -387,7 +568,7 @@ index 8620614..60deba8 100644
                      }
                      // Display name of the active channel: the picked entry when
                      // the channel list was loaded, otherwise the stored name.
-@@ -1427,9 +1427,9 @@ fun SettingsScreen(
+@@ -1427,9 +1428,9 @@ fun SettingsScreen(
                                      iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
                                      title = stringResource(R.string.settings_yt_history),
                                      subtitle = if (ytHistorySyncEnabled) {
@@ -399,7 +580,7 @@ index 8620614..60deba8 100644
                                      },
                                      checked = ytHistorySyncEnabled,
                                      onCheckedChange = viewModel::setYtHistorySyncEnabled,
-@@ -1486,7 +1486,7 @@ fun SettingsScreen(
+@@ -1486,7 +1487,7 @@ fun SettingsScreen(
                          subtitle = if (discordPresenceEnabled) {
                              "On • your track, quality and cover show on your Discord profile"
                          } else {
@@ -408,7 +589,7 @@ index 8620614..60deba8 100644
                          },
                          checked = discordPresenceEnabled,
                          onCheckedChange = viewModel::setDiscordPresenceEnabled,
-@@ -1662,52 +1662,9 @@ fun SettingsScreen(
+@@ -1662,52 +1663,9 @@ fun SettingsScreen(
                          item {
                  Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                      SectionLabel(stringResource(R.string.settings_section_about))
@@ -462,7 +643,7 @@ index 8620614..60deba8 100644
                                  icon = Icons.Filled.Code,
                                  iconContainer = MaterialTheme.colorScheme.secondaryContainer,
                                  iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
-@@ -1804,21 +1761,6 @@ fun SettingsScreen(
+@@ -1804,21 +1762,6 @@ fun SettingsScreen(
                          },
                          isHighlighted = (highlightedSettingId == "about.check_updates"),
                      )
@@ -484,7 +665,15 @@ index 8620614..60deba8 100644
                  }
              }
                      }
-@@ -3611,13 +3553,13 @@ private fun AboutCard(versionName: String) {
+@@ -3584,6 +3527,7 @@ private fun ColorTile(
+ 
+ @Composable
+ private fun AboutCard(versionName: String) {
++    val context = LocalContext.current
+     Card(
+         shape = CardOuterShape,
+         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+@@ -3611,13 +3555,13 @@ private fun AboutCard(versionName: String) {
              ) {
                  Icon(
                      painter = painterResource(R.drawable.ic_launcher_logo),
@@ -500,7 +689,7 @@ index 8620614..60deba8 100644
              Spacer(Modifier.height(8.dp))
              Surface(
                  shape = ExpressivePillShape,
-@@ -3638,6 +3580,21 @@ private fun AboutCard(versionName: String) {
+@@ -3638,6 +3582,41 @@ private fun AboutCard(versionName: String) {
                  color = MaterialTheme.colorScheme.onSurfaceVariant,
                  textAlign = TextAlign.Center,
              )
@@ -514,6 +703,26 @@ index 8620614..60deba8 100644
 +            )
 +            Spacer(Modifier.height(4.dp))
 +            Text(
++                "14 · Class 8 · Aspiring Software Engineer",
++                style = MaterialTheme.typography.bodySmall,
++                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                textAlign = TextAlign.Center,
++            )
++            Spacer(Modifier.height(4.dp))
++            val portfolioUri = remember { Uri.parse("https://iamadityajha.vercel.app") }
++            Text(
++                "iamadityajha.vercel.app",
++                style = MaterialTheme.typography.bodySmall.copy(textDecoration = TextDecoration.Underline),
++                color = MaterialTheme.colorScheme.primary,
++                textAlign = TextAlign.Center,
++                fontWeight = FontWeight.Medium,
++                modifier = Modifier.clickable {
++                    val intent = Intent(Intent.ACTION_VIEW, portfolioUri)
++                    startActivitySafely(context, intent)
++                },
++            )
++            Spacer(Modifier.height(4.dp))
++            Text(
 +                "Based on LastWave by Clash-Projects · GPL-3.0",
 +                style = MaterialTheme.typography.bodySmall,
 +                color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -522,7 +731,7 @@ index 8620614..60deba8 100644
          }
      }
  }
-@@ -4365,7 +4322,7 @@ private fun YouTubeChannelSheet(
+@@ -4365,7 +4344,7 @@ private fun YouTubeChannelSheet(
                  Column(Modifier.weight(1f)) {
                      Text("YouTube Channel", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                      Text(
@@ -531,7 +740,7 @@ index 8620614..60deba8 100644
                          style = MaterialTheme.typography.bodySmall,
                          color = MaterialTheme.colorScheme.onSurfaceVariant,
                      )
-@@ -4527,7 +4484,7 @@ private fun YouTubeLibraryVisibilitySheet(
+@@ -4527,7 +4506,7 @@ private fun YouTubeLibraryVisibilitySheet(
                  Column(Modifier.weight(1f)) {
                      Text("YouTube Playlists Shown", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                      Text(
@@ -553,6 +762,30 @@ index bf5f52d..bd29df0 100644
                      keywords = listOf(
                          "show playlists", "hide playlists", "visibility", "account playlists",
                          "library visibility", "filter playlists"
+diff --git a/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt b/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
+index 00592d2..33b6163 100644
+--- a/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
++++ b/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
+@@ -200,6 +200,7 @@ fun MainShell(
+     onOpenGenerator: () -> Unit = {},
+     onOpenNewReleases: () -> Unit = {},
+     onOpenDownloads: () -> Unit = {},
++    onOpenSpotifyImport: () -> Unit = {},
+     mainShellViewModel: MainShellViewModel = hiltViewModel(),
+ ) {
+     val tabs = MainTab.entries
+@@ -262,7 +263,10 @@ fun MainShell(
+                         onOpenFriends = onOpenFriends,
+                         onOpenDownloads = onOpenDownloads,
+                     )
+-                    MainTab.PLAYLISTS -> PlaylistScreen(onOpenPlaylist = onOpenPlaylist)
++                    MainTab.PLAYLISTS -> PlaylistScreen(
++                        onOpenPlaylist = onOpenPlaylist,
++                        onOpenSpotifyImport = onOpenSpotifyImport,
++                    )
+                 }
+             }
+         }
 diff --git a/app/src/main/res/drawable/ic_launcher_foreground.xml b/app/src/main/res/drawable/ic_launcher_foreground.xml
 index 7e40013..eca55e3 100644
 --- a/app/src/main/res/drawable/ic_launcher_foreground.xml
