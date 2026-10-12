@@ -39,19 +39,19 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Build debug APK
+      - name: Build release APK
         working-directory: source
         run: |
           chmod +x gradlew
-          ./gradlew :app:assembleDebug --stacktrace
+          ./gradlew :app:assembleRelease --stacktrace
 
       - name: Rename APK
-        run: cp source/app/build/outputs/apk/debug/app-debug.apk AdiMusic-v4.2.4.apk
+        run: cp source/app/build/outputs/apk/release/app-release.apk AdiMusic-v4.2.5.apk
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.2.4-adimusic
-          name: "AdiMusic v4.2.4"
-          body: "AdiMusic — Android music player (rebranded from LastWave-Native by Clash-Projects, GPL-3.0). Debug APK: download karke phone me install karo (unknown apps allow karna padega)."
-          files: AdiMusic-v4.2.4.apk
+          tag_name: v4.2.5-adimusic
+          name: "AdiMusic v4.2.5"
+          body: "AdiMusic v4.2.5 — full AdiMusic rebrand, new app icon, faster release build. Purana version ke upar seedha install ho jayega."
+          files: AdiMusic-v4.2.5.apk
