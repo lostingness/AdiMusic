@@ -1,0 +1,586 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 9185f26..3c0e99b 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -14,6 +14,8 @@ plugins {
+ android {
+     namespace = "com.lastwave.app"
+     compileSdk = 37
++    // Pinned so CI installs exactly this NDK (AdiMusic build).
++    ndkVersion = "28.2.13610387"
+ 
+     val localProps = Properties().apply {
+         val localPropsFile = rootProject.file("local.properties")
+diff --git a/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt b/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt
+index d38df5e..748c1c3 100644
+--- a/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt
++++ b/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt
+@@ -57,83 +57,16 @@ class AppUpdateManager @Inject constructor(
+     }
+ 
+     fun checkForUpdate(isSilent: Boolean = false) {
++        // AdiMusic rebrand: update checks against the original LastWave repo are
++        // disabled — pointing users at another project's releases would be wrong.
++        // Point this at your own releases feed if you publish AdiMusic builds.
+         scope.launch {
+             _updateInfo.update {
+                 it.copy(
+-                    isChecking = true,
+-                    message = if (!isSilent) "Checking for updates..." else it.message,
++                    isChecking = false,
++                    message = if (!isSilent) "Update checks are disabled in this build" else it.message,
+                 )
+             }
+-            try {
+-                val request = Request.Builder()
+-                    .url("https://api.github.com/repos/Clash-Projects/LastWave-native/releases/latest")
+-                    .header("Accept", "application/vnd.github.v3+json")
+-                    .header("User-Agent", "LastWave-Android")
+-                    .build()
+-
+-                val response = withContext(Dispatchers.IO) {
+-                    okHttpClient.newCall(request).execute()
+-                }
+-
+-                if (!response.isSuccessful) {
+-                    val code = response.code
+-                    _updateInfo.update {
+-                        it.copy(
+-                            isChecking = false,
+-                            message = if (!isSilent) "Could not check updates (HTTP $code)" else null,
+-                        )
+-                    }
+-                    return@launch
+-                }
+-
+-                val body = response.body?.string().orEmpty()
+-                val json = JSONObject(body)
+-                val tagName = json.optString("tag_name", "")
+-                val releaseUrl = json.optString("html_url", "https://github.com/Clash-Projects/LastWave-native/releases")
+-                val releaseNotes = json.optString("body", "")
+-
+-                var downloadUrl: String? = null
+-                val assets = json.optJSONArray("assets")
+-                if (assets != null) {
+-                    for (i in 0 until assets.length()) {
+-                        val asset = assets.optJSONObject(i)
+-                        val name = asset?.optString("name", "").orEmpty()
+-                        if (name.endsWith(".apk", ignoreCase = true)) {
+-                            downloadUrl = asset?.optString("browser_download_url")
+-                            break
+-                        }
+-                    }
+-                }
+-
+-                val currentVersion = getCurrentVersion()
+-                val hasNewer = isNewerVersion(tagName, currentVersion)
+-                val cleanTag = tagName.removePrefix("v").removePrefix("V")
+-                val dismissedVersion = prefs.getString("dismissed_version", null)
+-                val isDismissed = dismissedVersion == cleanTag
+-
+-                _updateInfo.update {
+-                    it.copy(
+-                        isChecking = false,
+-                        isUpdateAvailable = hasNewer,
+-                        latestVersion = cleanTag,
+-                        currentVersion = currentVersion,
+-                        releaseNotes = releaseNotes,
+-                        releaseUrl = releaseUrl,
+-                        downloadUrl = downloadUrl ?: releaseUrl,
+-                        isDismissed = isDismissed,
+-                        message = if (!isSilent) {
+-                            if (hasNewer) "New version $cleanTag available!" else "You're on the latest version ($currentVersion)"
+-                        } else null,
+-                    )
+-                }
+-            } catch (e: Exception) {
+-                _updateInfo.update {
+-                    it.copy(
+-                        isChecking = false,
+-                        message = if (!isSilent) "Check failed: ${e.message ?: "Network error"}" else null,
+-                    )
+-                }
+-            }
+         }
+     }
+ 
+@@ -144,15 +77,9 @@ class AppUpdateManager @Inject constructor(
+     }
+ 
+     fun openUpdate(context: Context) {
+-        val targetUrl = _updateInfo.value.downloadUrl ?: _updateInfo.value.releaseUrl.ifBlank {
+-            "https://github.com/Clash-Projects/LastWave-native/releases"
+-        }
+-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(targetUrl)).apply {
+-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+-        }
+-        try {
+-            context.startActivity(intent)
+-        } catch (_: Exception) { }
++        // AdiMusic rebrand: updates are disabled in this build, so there is
++        // nothing to open. (Previously fell back to the original repo releases.)
++        return
+     }
+ 
+     fun isNewerVersion(remote: String, local: String): Boolean {
+diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
+index 8620614..6e9b57e 100644
+--- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
+@@ -3611,13 +3611,13 @@ private fun AboutCard(versionName: String) {
+             ) {
+                 Icon(
+                     painter = painterResource(R.drawable.ic_launcher_logo),
+-                    contentDescription = "LastWave",
++                    contentDescription = "AdiMusic",
+                     tint = Color.Unspecified,
+                     modifier = Modifier.size(72.dp),
+                 )
+             }
+             Spacer(Modifier.height(14.dp))
+-            Text("LastWave", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
++            Text("AdiMusic", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+             Spacer(Modifier.height(8.dp))
+             Surface(
+                 shape = ExpressivePillShape,
+@@ -3638,6 +3638,21 @@ private fun AboutCard(versionName: String) {
+                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                 textAlign = TextAlign.Center,
+             )
++            Spacer(Modifier.height(4.dp))
++            Text(
++                "Developed by Aditya Jha",
++                style = MaterialTheme.typography.bodySmall,
++                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                textAlign = TextAlign.Center,
++                fontWeight = FontWeight.Medium,
++            )
++            Spacer(Modifier.height(4.dp))
++            Text(
++                "Based on LastWave by Clash-Projects · GPL-3.0",
++                style = MaterialTheme.typography.bodySmall,
++                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                textAlign = TextAlign.Center,
++            )
+         }
+     }
+ }
+diff --git a/app/src/main/res/values-ar/strings.xml b/app/src/main/res/values-ar/strings.xml
+index 1f32b55..52881bb 100644
+--- a/app/src/main/res/values-ar/strings.xml
++++ b/app/src/main/res/values-ar/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">مشغّل LastWave</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">مشغّل AdiMusic</string>
+     <string name="widget_description">الغلاف وتفاصيل المقطوعة وعناصر التحكم بالتشغيل لجميع تطبيقات الوسائط</string>
+ 
+     <string name="nav_feed">الموجز</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">يتوفر تحديث</string>
+     <string name="update">تحديث</string>
+     <string name="dismiss_update">إغلاق التحديث</string>
+-    <string name="update_ready_to_install">LastWave v%1$s جاهز للتثبيت</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s جاهز للتثبيت</string>
+ 
+     <string name="settings">الإعدادات</string>
+     <string name="settings_section_language">اللغة</string>
+@@ -116,7 +116,7 @@
+     <string name="dialog_clear_all_text">سيؤدي هذا إلى إزالة بيانات الاعتماد والقوائم والبيانات المخزنة. لا يمكن التراجع.</string>
+     <string name="dialog_clear_all_confirm">مسح الكل</string>
+     <string name="dialog_disconnect_yt_title">قطع اتصال YouTube Music؟</string>
+-    <string name="dialog_disconnect_yt_text">القوائم المنعكسة في حسابك تبقى، لكن LastWave يتوقف عن المزامنة وينسى الاتصال.</string>
++    <string name="dialog_disconnect_yt_text">القوائم المنعكسة في حسابك تبقى، لكن AdiMusic يتوقف عن المزامنة وينسى الاتصال.</string>
+     <string name="dialog_logout_title">تسجيل الخروج من Last.fm؟</string>
+     <string name="dialog_logout_text">ستبقى قوائمك وبياناتك المخزنة.</string>
+     <string name="common_save">حفظ</string>
+diff --git a/app/src/main/res/values-de/strings.xml b/app/src/main/res/values-de/strings.xml
+index cc5a84a..ad258de 100644
+--- a/app/src/main/res/values-de/strings.xml
++++ b/app/src/main/res/values-de/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">LastWave Player</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">AdiMusic Player</string>
+     <string name="widget_description">Cover, Trackdetails und Wiedergabesteuerung für alle Medien-Apps</string>
+ 
+     <string name="nav_feed">Feed</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Update verfügbar</string>
+     <string name="update">Aktualisieren</string>
+     <string name="dismiss_update">Update verwerfen</string>
+-    <string name="update_ready_to_install">LastWave v%1$s ist bereit zur Installation</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s ist bereit zur Installation</string>
+ 
+     <string name="settings">Einstellungen</string>
+     <string name="settings_section_language">Sprache</string>
+@@ -116,7 +116,7 @@
+     <string name="dialog_clear_all_text">Entfernt Anmeldedaten, Playlists und Cache. Kann nicht rückgängig gemacht werden.</string>
+     <string name="dialog_clear_all_confirm">Alles löschen</string>
+     <string name="dialog_disconnect_yt_title">YouTube Music trennen?</string>
+-    <string name="dialog_disconnect_yt_text">Bereits gespiegelte Playlists bleiben im Konto, aber LastWave stoppt den Sync und vergisst die Verbindung.</string>
++    <string name="dialog_disconnect_yt_text">Bereits gespiegelte Playlists bleiben im Konto, aber AdiMusic stoppt den Sync und vergisst die Verbindung.</string>
+     <string name="dialog_logout_title">Von Last.fm abmelden?</string>
+     <string name="dialog_logout_text">Playlists und Cache bleiben erhalten.</string>
+     <string name="common_save">Speichern</string>
+diff --git a/app/src/main/res/values-es/strings.xml b/app/src/main/res/values-es/strings.xml
+index 5cde261..77b7e2a 100644
+--- a/app/src/main/res/values-es/strings.xml
++++ b/app/src/main/res/values-es/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">Reproductor LastWave</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">Reproductor AdiMusic</string>
+     <string name="widget_description">Portada, detalles de la canción y controles de reproducción para todas las apps de música</string>
+ 
+     <string name="nav_feed">Inicio</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Actualización disponible</string>
+     <string name="update">Actualizar</string>
+     <string name="dismiss_update">Descartar actualización</string>
+-    <string name="update_ready_to_install">LastWave v%1$s lista para instalar</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s lista para instalar</string>
+ 
+     <string name="settings">Ajustes</string>
+     <string name="settings_section_language">Idioma</string>
+@@ -116,7 +116,7 @@
+     <string name="dialog_clear_all_text">Esto elimina tus credenciales, listas y datos en caché. No se puede deshacer.</string>
+     <string name="dialog_clear_all_confirm">Borrar todo</string>
+     <string name="dialog_disconnect_yt_title">¿Desconectar YouTube Music?</string>
+-    <string name="dialog_disconnect_yt_text">Las listas ya reflejadas en tu cuenta se conservan, pero LastWave deja de sincronizar y olvida la conexión.</string>
++    <string name="dialog_disconnect_yt_text">Las listas ya reflejadas en tu cuenta se conservan, pero AdiMusic deja de sincronizar y olvida la conexión.</string>
+     <string name="dialog_logout_title">¿Cerrar sesión de Last.fm?</string>
+     <string name="dialog_logout_text">Tus listas y datos en caché se conservarán.</string>
+     <string name="common_save">Guardar</string>
+diff --git a/app/src/main/res/values-fr/strings.xml b/app/src/main/res/values-fr/strings.xml
+index 7fbe17e..24a43b9 100644
+--- a/app/src/main/res/values-fr/strings.xml
++++ b/app/src/main/res/values-fr/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">Lecteur LastWave</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">Lecteur AdiMusic</string>
+     <string name="widget_description">Pochette, détails du morceau et contrôles de lecture pour toutes les apps média</string>
+ 
+     <string name="nav_feed">Fil</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Mise à jour disponible</string>
+     <string name="update">Mettre à jour</string>
+     <string name="dismiss_update">Ignorer la mise à jour</string>
+-    <string name="update_ready_to_install">LastWave v%1$s prête à installer</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s prête à installer</string>
+ 
+     <string name="settings">Paramètres</string>
+     <string name="settings_section_language">Langue</string>
+@@ -116,7 +116,7 @@
+     <string name="dialog_clear_all_text">Supprime vos identifiants, playlists et données en cache. Irréversible.</string>
+     <string name="dialog_clear_all_confirm">Tout effacer</string>
+     <string name="dialog_disconnect_yt_title">Déconnecter YouTube Music ?</string>
+-    <string name="dialog_disconnect_yt_text">Les playlists déjà reflétées sur votre compte y restent, mais LastWave arrête la synchronisation et oublie la connexion.</string>
++    <string name="dialog_disconnect_yt_text">Les playlists déjà reflétées sur votre compte y restent, mais AdiMusic arrête la synchronisation et oublie la connexion.</string>
+     <string name="dialog_logout_title">Se déconnecter de Last.fm ?</string>
+     <string name="dialog_logout_text">Vos playlists et données en cache seront conservées.</string>
+     <string name="common_save">Enregistrer</string>
+diff --git a/app/src/main/res/values-hi/strings.xml b/app/src/main/res/values-hi/strings.xml
+index ca50540..437eac8 100644
+--- a/app/src/main/res/values-hi/strings.xml
++++ b/app/src/main/res/values-hi/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">LastWave प्लेयर</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">AdiMusic प्लेयर</string>
+     <string name="widget_description">सभी मीडिया ऐप्स के लिए कवर, गाने की जानकारी और प्लेबैक नियंत्रण</string>
+ 
+     <string name="nav_feed">फ़ीड</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">अपडेट उपलब्ध</string>
+     <string name="update">अपडेट करें</string>
+     <string name="dismiss_update">अपडेट हटाएँ</string>
+-    <string name="update_ready_to_install">LastWave v%1$s इंस्टॉल के लिए तैयार</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s इंस्टॉल के लिए तैयार</string>
+ 
+     <string name="settings">सेटिंग्स</string>
+     <string name="settings_section_language">भाषा</string>
+@@ -116,7 +116,7 @@
+     <string name="dialog_clear_all_text">इससे क्रेडेंशियल, प्लेलिस्ट और कैश डेटा हट जाएगा। पूर्ववत नहीं होगा।</string>
+     <string name="dialog_clear_all_confirm">सब मिटाएँ</string>
+     <string name="dialog_disconnect_yt_title">YouTube Music डिस्कनेक्ट करें?</string>
+-    <string name="dialog_disconnect_yt_text">खाते में प्रतिबिंबित प्लेलिस्ट वहीं रहेंगी, पर LastWave सिंक बंद कर देगा और कनेक्शन भूल जाएगा।</string>
++    <string name="dialog_disconnect_yt_text">खाते में प्रतिबिंबित प्लेलिस्ट वहीं रहेंगी, पर AdiMusic सिंक बंद कर देगा और कनेक्शन भूल जाएगा।</string>
+     <string name="dialog_logout_title">Last.fm से लॉग आउट करें?</string>
+     <string name="dialog_logout_text">आपकी प्लेलिस्ट और कैश डेटा रखा जाएगा।</string>
+     <string name="common_save">सहेजें</string>
+diff --git a/app/src/main/res/values-in/strings.xml b/app/src/main/res/values-in/strings.xml
+index b237bab..8dbd494 100644
+--- a/app/src/main/res/values-in/strings.xml
++++ b/app/src/main/res/values-in/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">Pemutar LastWave</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">Pemutar AdiMusic</string>
+     <string name="widget_description">Sampul, detail lagu, dan kontrol pemutaran untuk semua aplikasi media</string>
+ 
+     <string name="nav_feed">Beranda</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Pembaruan tersedia</string>
+     <string name="update">Perbarui</string>
+     <string name="dismiss_update">Abaikan pembaruan</string>
+-    <string name="update_ready_to_install">LastWave v%1$s siap dipasang</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s siap dipasang</string>
+ 
+     <string name="settings">Pengaturan</string>
+     <string name="settings_section_language">Bahasa</string>
+@@ -116,7 +116,7 @@
+     <string name="dialog_clear_all_text">Ini menghapus kredensial, playlist, dan data cache. Tidak dapat dibatalkan.</string>
+     <string name="dialog_clear_all_confirm">Hapus semua</string>
+     <string name="dialog_disconnect_yt_title">Putuskan YouTube Music?</string>
+-    <string name="dialog_disconnect_yt_text">Playlist yang sudah dicerminkan ke akun tetap ada, tetapi LastWave berhenti menyinkronkan dan melupakan koneksi.</string>
++    <string name="dialog_disconnect_yt_text">Playlist yang sudah dicerminkan ke akun tetap ada, tetapi AdiMusic berhenti menyinkronkan dan melupakan koneksi.</string>
+     <string name="dialog_logout_title">Keluar dari Last.fm?</string>
+     <string name="dialog_logout_text">Playlist dan data cache Anda tetap disimpan.</string>
+     <string name="common_save">Simpan</string>
+diff --git a/app/src/main/res/values-ja/strings.xml b/app/src/main/res/values-ja/strings.xml
+index 4e94930..21c1981 100644
+--- a/app/src/main/res/values-ja/strings.xml
++++ b/app/src/main/res/values-ja/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">LastWave プレーヤー</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">AdiMusic プレーヤー</string>
+     <string name="widget_description">すべてのメディアアプリのジャケット、曲情報、再生コントロール</string>
+ 
+     <string name="nav_feed">フィード</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">アップデートあり</string>
+     <string name="update">更新</string>
+     <string name="dismiss_update">アップデートを閉じる</string>
+-    <string name="update_ready_to_install">LastWave v%1$s をインストールできます</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s をインストールできます</string>
+ 
+     <string name="settings">設定</string>
+     <string name="settings_section_language">言語</string>
+@@ -116,7 +116,7 @@
+     <string name="dialog_clear_all_text">認証情報、プレイリスト、キャッシュデータが削除されます。元に戻せません。</string>
+     <string name="dialog_clear_all_confirm">すべて消去</string>
+     <string name="dialog_disconnect_yt_title">YouTube Music を切断しますか?</string>
+-    <string name="dialog_disconnect_yt_text">アカウントにミラー済みのプレイリストは残りますが、LastWave は同期を停止し接続を忘れます。</string>
++    <string name="dialog_disconnect_yt_text">アカウントにミラー済みのプレイリストは残りますが、AdiMusic は同期を停止し接続を忘れます。</string>
+     <string name="dialog_logout_title">Last.fm からログアウトしますか?</string>
+     <string name="dialog_logout_text">プレイリストとキャッシュデータは保持されます。</string>
+     <string name="common_save">保存</string>
+diff --git a/app/src/main/res/values-ko/strings.xml b/app/src/main/res/values-ko/strings.xml
+index c16f0e6..ad49f3f 100644
+--- a/app/src/main/res/values-ko/strings.xml
++++ b/app/src/main/res/values-ko/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">LastWave 플레이어</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">AdiMusic 플레이어</string>
+     <string name="widget_description">모든 미디어 앱의 앨범아트, 곡 정보 및 재생 컨트롤</string>
+ 
+     <string name="nav_feed">피드</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">업데이트 있음</string>
+     <string name="update">업데이트</string>
+     <string name="dismiss_update">업데이트 닫기</string>
+-    <string name="update_ready_to_install">LastWave v%1$s를 설치할 수 있습니다</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s를 설치할 수 있습니다</string>
+ 
+     <string name="settings">설정</string>
+     <string name="settings_section_language">언어</string>
+@@ -116,7 +116,7 @@
+     <string name="dialog_clear_all_text">로그인 정보, 플레이리스트, 캐시 데이터가 삭제됩니다. 되돌릴 수 없습니다.</string>
+     <string name="dialog_clear_all_confirm">모두 지우기</string>
+     <string name="dialog_disconnect_yt_title">YouTube Music 연결을 해제할까요?</string>
+-    <string name="dialog_disconnect_yt_text">계정에 미러링된 플레이리스트는 유지되지만 LastWave는 동기화를 중단하고 연결을 삭제합니다.</string>
++    <string name="dialog_disconnect_yt_text">계정에 미러링된 플레이리스트는 유지되지만 AdiMusic는 동기화를 중단하고 연결을 삭제합니다.</string>
+     <string name="dialog_logout_title">Last.fm에서 로그아웃할까요?</string>
+     <string name="dialog_logout_text">플레이리스트와 캐시 데이터는 유지됩니다.</string>
+     <string name="common_save">저장</string>
+diff --git a/app/src/main/res/values-pt-rBR/strings.xml b/app/src/main/res/values-pt-rBR/strings.xml
+index db6e647..fb097f4 100644
+--- a/app/src/main/res/values-pt-rBR/strings.xml
++++ b/app/src/main/res/values-pt-rBR/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">LastWave Player</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">AdiMusic Player</string>
+     <string name="widget_description">Capa, detalhes da faixa e controles de reprodução para todos os apps de mídia</string>
+ 
+     <string name="nav_feed">Início</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Atualização disponível</string>
+     <string name="update">Atualizar</string>
+     <string name="dismiss_update">Dispensar atualização</string>
+-    <string name="update_ready_to_install">LastWave v%1$s pronta para instalar</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s pronta para instalar</string>
+ 
+     <string name="settings">Configurações</string>
+     <string name="settings_section_language">Idioma</string>
+@@ -116,7 +116,7 @@
+     <string name="dialog_clear_all_text">Isso remove credenciais, playlists e dados em cache. Não pode ser desfeito.</string>
+     <string name="dialog_clear_all_confirm">Apagar tudo</string>
+     <string name="dialog_disconnect_yt_title">Desconectar o YouTube Music?</string>
+-    <string name="dialog_disconnect_yt_text">As playlists já espelhadas na sua conta permanecem, mas o LastWave para de sincronizar e esquece a conexão.</string>
++    <string name="dialog_disconnect_yt_text">As playlists já espelhadas na sua conta permanecem, mas o AdiMusic para de sincronizar e esquece a conexão.</string>
+     <string name="dialog_logout_title">Sair do Last.fm?</string>
+     <string name="dialog_logout_text">Suas playlists e dados em cache serão mantidos.</string>
+     <string name="common_save">Salvar</string>
+diff --git a/app/src/main/res/values-ru/strings.xml b/app/src/main/res/values-ru/strings.xml
+index dba061b..65062ac 100644
+--- a/app/src/main/res/values-ru/strings.xml
++++ b/app/src/main/res/values-ru/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">LastWave Плеер</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">AdiMusic Плеер</string>
+     <string name="widget_description">Обложка, информация о треке и управление воспроизведением для всех медиаприложений</string>
+ 
+     <string name="nav_feed">Лента</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Доступно обновление</string>
+     <string name="update">Обновить</string>
+     <string name="dismiss_update">Скрыть обновление</string>
+-    <string name="update_ready_to_install">LastWave v%1$s готова к установке</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s готова к установке</string>
+ 
+     <string name="settings">Настройки</string>
+     <string name="settings_section_language">Язык</string>
+@@ -116,7 +116,7 @@
+     <string name="dialog_clear_all_text">Это удалит ваши учётные данные, плейлисты и кэшированные данные. Действие необратимо.</string>
+     <string name="dialog_clear_all_confirm">Удалить всё</string>
+     <string name="dialog_disconnect_yt_title">Отключить YouTube Music?</string>
+-    <string name="dialog_disconnect_yt_text">Плейлисты, уже отражённые в вашем аккаунте, останутся, но LastWave прекратит синхронизацию и забудет подключение.</string>
++    <string name="dialog_disconnect_yt_text">Плейлисты, уже отражённые в вашем аккаунте, останутся, но AdiMusic прекратит синхронизацию и забудет подключение.</string>
+     <string name="dialog_logout_title">Выйти из Last.fm?</string>
+     <string name="dialog_logout_text">Ваши плейлисты и кэшированные данные сохранятся.</string>
+     <string name="common_save">Сохранить</string>
+diff --git a/app/src/main/res/values-tr/strings.xml b/app/src/main/res/values-tr/strings.xml
+index 1255a47..46de715 100644
+--- a/app/src/main/res/values-tr/strings.xml
++++ b/app/src/main/res/values-tr/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">LastWave Oynatıcı</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">AdiMusic Oynatıcı</string>
+     <string name="widget_description">Tüm medya uygulamaları için kapak, parça bilgisi ve oynatma kontrolleri</string>
+ 
+     <!-- Alt gezinti -->
+@@ -12,7 +12,7 @@
+     <string name="update_available">Güncelleme Mevcut</string>
+     <string name="update">Güncelle</string>
+     <string name="dismiss_update">Güncellemeyi kapat</string>
+-    <string name="update_ready_to_install">LastWave v%1$s kurulmaya hazır</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s kurulmaya hazır</string>
+ 
+     <!-- Ayarlar -->
+     <string name="settings">Ayarlar</string>
+@@ -119,7 +119,7 @@
+     <string name="dialog_clear_all_text">Kimlik bilgileriniz, listeleriniz ve önbelleğe alınmış veriler kaldırılır. Bu işlem geri alınamaz.</string>
+     <string name="dialog_clear_all_confirm">Her Şeyi Temizle</string>
+     <string name="dialog_disconnect_yt_title">YouTube Music bağlantısı kesilsin mi?</string>
+-    <string name="dialog_disconnect_yt_text">Hesabınıza yansıtılan listeler orada kalır, ancak LastWave eşitlemeyi durdurur ve bağlantıyı unutur.</string>
++    <string name="dialog_disconnect_yt_text">Hesabınıza yansıtılan listeler orada kalır, ancak AdiMusic eşitlemeyi durdurur ve bağlantıyı unutur.</string>
+     <string name="dialog_logout_title">Last.fm\'den çıkış yapılsın mı?</string>
+     <string name="dialog_logout_text">Listeleriniz ve önbelleğe alınmış verileriniz korunur.</string>
+     <string name="common_save">Kaydet</string>
+diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
+index 2a7c146..c3b76e1 100644
+--- a/app/src/main/res/values-zh-rCN/strings.xml
++++ b/app/src/main/res/values-zh-rCN/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">LastWave 播放器</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">AdiMusic 播放器</string>
+     <string name="widget_description">所有媒体应用的封面、曲目信息和播放控制</string>
+ 
+     <!-- 底部导航 -->
+@@ -12,7 +12,7 @@
+     <string name="update_available">有可用更新</string>
+     <string name="update">更新</string>
+     <string name="dismiss_update">忽略更新</string>
+-    <string name="update_ready_to_install">LastWave v%1$s 已就绪，可安装</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s 已就绪，可安装</string>
+ 
+     <!-- 设置 -->
+     <string name="settings">设置</string>
+@@ -119,7 +119,7 @@
+     <string name="dialog_clear_all_text">这将删除您的凭据、歌单和缓存数据，且无法撤销。</string>
+     <string name="dialog_clear_all_confirm">全部清除</string>
+     <string name="dialog_disconnect_yt_title">断开 YouTube Music？</string>
+-    <string name="dialog_disconnect_yt_text">已同步到您账号的歌单会保留，但 LastWave 将停止同步并忘记该连接。</string>
++    <string name="dialog_disconnect_yt_text">已同步到您账号的歌单会保留，但 AdiMusic 将停止同步并忘记该连接。</string>
+     <string name="dialog_logout_title">退出 Last.fm？</string>
+     <string name="dialog_logout_text">您的歌单和缓存数据将被保留。</string>
+     <string name="common_save">保存</string>
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index d04db45..ef8ddcb 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -1,9 +1,9 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">LastWave</string>
+-    <string name="widget_name">LastWave Player</string>
++    <string name="app_name">AdiMusic</string>
++    <string name="widget_name">AdiMusic Player</string>
+     <string name="widget_description">Artwork, track details and playback controls for every media app</string>
+-    <string name="widget_obsidian_name">LastWave Obsidian Glass</string>
++    <string name="widget_obsidian_name">AdiMusic Obsidian Glass</string>
+     <string name="widget_obsidian_description">Frosted obsidian glass player with translucent depth and crystal rim</string>
+ 
+     <!-- Bottom navigation -->
+@@ -14,7 +14,7 @@
+     <string name="update_available">Update Available</string>
+     <string name="update">Update</string>
+     <string name="dismiss_update">Dismiss update</string>
+-    <string name="update_ready_to_install">LastWave v%1$s is ready to install</string>
++    <string name="update_ready_to_install">AdiMusic v%1$s is ready to install</string>
+ 
+     <!-- Settings -->
+     <string name="settings">Settings</string>
+@@ -318,7 +318,7 @@
+     <string name="dialog_clear_all_text">This removes your credentials, playlists, downloaded songs, and cached data. This can\'t be undone.</string>
+     <string name="dialog_clear_all_confirm">Clear Everything</string>
+     <string name="dialog_disconnect_yt_title">Disconnect YouTube Music?</string>
+-    <string name="dialog_disconnect_yt_text">Playlists already mirrored to your account stay there, but LastWave stops syncing and forgets the connection.</string>
++    <string name="dialog_disconnect_yt_text">Playlists already mirrored to your account stay there, but AdiMusic stops syncing and forgets the connection.</string>
+     <string name="dialog_logout_title">Log out from Last.fm?</string>
+     <string name="dialog_logout_text">Your playlists and cached data will be kept.</string>
+ 
