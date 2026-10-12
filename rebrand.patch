@@ -418,10 +418,10 @@ index 0f324cb..1a55d93 100644
  ) {
      fun toPlayable(): PlayableTrack = PlayableTrack(
 diff --git a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
-index 5373fd0..031a6bd 100644
+index 5373fd0..21d4f35 100644
 --- a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
-@@ -244,6 +244,9 @@ fun LastWaveNavHost(
+@@ -280,6 +280,9 @@ fun LastWaveNavHost(
                  onOpenDownloads = {
                      navController.navigate(Screen.Downloads.route)
                  },
