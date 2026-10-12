@@ -39,27 +39,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install NDK, CMake and Android platform
-        run: |
-          set -e
-          if [ -z "$ANDROID_HOME" ]; then
-            export ANDROID_HOME=/usr/local/lib/android/sdk
-            export ANDROID_SDK_ROOT=/usr/local/lib/android/sdk
-          fi
-          export PATH="$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH"
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          sdkmanager --version
-          yes | sdkmanager --licenses > /dev/null 2>&1 || true
-          sdkmanager "ndk;28.2.13610387" "cmake;3.22.1" "platforms;android-37" "build-tools;35.0.0"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.3.1'
-
       - name: Build debug APK
         working-directory: source
-        run: gradle :app:assembleDebug --stacktrace
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:assembleDebug --stacktrace
 
       - name: Rename APK
         run: cp source/app/build/outputs/apk/debug/app-debug.apk AdiMusic-v4.2.4.apk
