@@ -57,12 +57,12 @@ jobs:
           ./gradlew :app:assembleRelease --stacktrace
 
       - name: Rename APK
-        run: cp source/app/build/outputs/apk/release/app-release.apk AdiMusic-v4.2.6.apk
+        run: cp source/app/build/outputs/apk/release/app-release.apk AdiMusic-v4.2.7.apk
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.2.6-adimusic
-          name: "AdiMusic v4.2.6"
-          body: "AdiMusic v4.2.6 — naya AdiMusic logo icon, tez release build. Pehle purana version uninstall karo (signature alag hai), phir install karo."
-          files: AdiMusic-v4.2.6.apk
+          tag_name: v4.2.7-adimusic
+          name: "AdiMusic v4.2.7"
+          body: "AdiMusic v4.2.7 — naye defaults (AMOLED/Liquid Glass on), About mein developer info, like button animation, playlist mein Spotify import button. Pehle purana version uninstall karo, phir install karo."
+          files: AdiMusic-v4.2.7.apk
