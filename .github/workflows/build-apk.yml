@@ -34,6 +34,11 @@ jobs:
           echo "--- app_name after patch:"
           grep -m1 'string name="app_name"' app/src/main/res/values/strings.xml
 
+      - name: Install AdiMusic launcher icon
+        run: |
+          base64 -d adimusic/assets/ic_launcher_foreground.png.b64 > source/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+          ls -la source/app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png
+
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -52,12 +57,12 @@ jobs:
           ./gradlew :app:assembleRelease --stacktrace
 
       - name: Rename APK
-        run: cp source/app/build/outputs/apk/release/app-release.apk AdiMusic-v4.2.5.apk
+        run: cp source/app/build/outputs/apk/release/app-release.apk AdiMusic-v4.2.6.apk
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.2.5-adimusic
-          name: "AdiMusic v4.2.5"
-          body: "AdiMusic v4.2.5 — full AdiMusic rebrand, new app icon, faster release build. Purana version ke upar seedha install ho jayega."
-          files: AdiMusic-v4.2.5.apk
+          tag_name: v4.2.6-adimusic
+          name: "AdiMusic v4.2.6"
+          body: "AdiMusic v4.2.6 — naya AdiMusic logo icon, tez release build. Pehle purana version uninstall karo (signature alag hai), phir install karo."
+          files: AdiMusic-v4.2.6.apk
