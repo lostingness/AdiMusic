@@ -24,6 +24,7 @@ jobs:
           cd source
           git checkout b6db40a7257c61636cda9694c0dd2774bcd1cb5c
 
+
       - name: Apply AdiMusic rebrand patch
         run: |
           set -e
@@ -38,6 +39,11 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+
+      - name: Create debug keystore for release signing
+        run: |
+          mkdir -p /home/runner/.config/.android
+          keytool -genkeypair -v -keystore /home/runner/.config/.android/debug.keystore -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -storepass android -keypass android -dname "CN=Android Debug,O=Android,C=US"
 
       - name: Build release APK
         working-directory: source
