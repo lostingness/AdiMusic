@@ -1,0 +1,67 @@
+name: Build AdiMusic APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout AdiMusic repo (workflow + rebrand patch)
+        uses: actions/checkout@v4
+        with:
+          path: adimusic
+
+      - name: Clone upstream LastWave-Native at pinned commit
+        run: |
+          set -e
+          git clone https://github.com/Clash-Projects/LastWave-Native.git source
+          cd source
+          git checkout b6db40a7257c61636cda9694c0dd2774bcd1cb5c
+
+      - name: Apply AdiMusic rebrand patch
+        run: |
+          set -e
+          cd source
+          git apply --check ../adimusic/rebrand.patch
+          git apply ../adimusic/rebrand.patch
+          echo "--- app_name after patch:"
+          grep -m1 'string name="app_name"' app/src/main/res/values/strings.xml
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK, CMake and Android platform
+        run: |
+          sdkmanager "ndk;28.2.13610387" "cmake;3.22.1" "platforms;android-37" "build-tools;35.0.0"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '9.3.1'
+
+      - name: Build debug APK
+        working-directory: source
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Rename APK
+        run: cp source/app/build/outputs/apk/debug/app-debug.apk AdiMusic-v4.2.4.apk
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v4.2.4-adimusic
+          name: "AdiMusic v4.2.4"
+          body: "AdiMusic — Android music player (rebranded from LastWave-Native by Clash-Projects, GPL-3.0). Debug APK: download karke phone me install karo (unknown apps allow karna padega)."
+          files: AdiMusic-v4.2.4.apk
