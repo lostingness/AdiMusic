@@ -1,3 +1,119 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 9185f26..408e313 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -60,8 +60,8 @@ android {
+         applicationId = "com.lastwave.app"
+         minSdk = (project.findProperty("minSdk") as? String)?.toIntOrNull() ?: 29
+         targetSdk = 35
+-        versionCode = 24
+-        versionName = "4.2.4"
++        versionCode = 25
++        versionName = "4.2.5"
+ 
+         val lastWaveLyricsToken = resolveSecret("LASTWAVE_LYRICS_TOKEN")
+         val lastWaveLyricsUrl = resolveSecret("LASTWAVE_LYRICS_URL")
+diff --git a/app/src/main/java/com/lastwave/app/data/download/TrackDownloadManager.kt b/app/src/main/java/com/lastwave/app/data/download/TrackDownloadManager.kt
+index 5a54bad..2a99b4d 100644
+--- a/app/src/main/java/com/lastwave/app/data/download/TrackDownloadManager.kt
++++ b/app/src/main/java/com/lastwave/app/data/download/TrackDownloadManager.kt
+@@ -155,7 +155,7 @@ class TrackDownloadManager @Inject constructor(
+         const val EXTRA_DOWNLOAD_TITLE = "download_title"
+         const val EXTRA_DOWNLOAD_ARTIST = "download_artist"
+         const val EXTRA_NAVIGATE_TO = "navigate_to"
+-        private const val PUBLIC_DIR_NAME = "LastWave"
++        private const val PUBLIC_DIR_NAME = "AdiMusic"
+         /** Legacy default kept for reading files downloaded before a custom folder was chosen. */
+         private const val LEGACY_PUBLIC_DIR_NAME = "LastWave"
+         // 128 KB keeps per-connection buffers out of the large-object heap:
+diff --git a/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt b/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
+index dc1aa93..b36fa4b 100644
+--- a/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
++++ b/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
+@@ -56,7 +56,7 @@ enum class LyricsAnimation(val id: String, val title: String, val description: S
+  *  proper nouns — no localization needed. */
+ enum class LyricsProvider(val id: String, val title: String, val subtitle: String) {
+     AUTO("auto", "Auto", "Fastest word-sync wins, LRCLIB fallback"),
+-    LASTWAVE("lastwave", "LastWave", "Syllable & line-synced Apple lyrics first"),
++    LASTWAVE("lastwave", "AdiMusic", "Syllable & line-synced Apple lyrics first"),
+     APPLE_MUSIC("apple_music", "Apple Music", "Syllable-synced Apple Music lyrics first"),
+     BETTER_LYRICS("better_lyrics", "BetterLyrics", "Word-synced lyrics first"),
+     KUGOU("kugou", "Kugou", "KRC word-synced lyrics first"),
+@@ -217,7 +217,7 @@ enum class DownloadFolderStructure(val id: String, val titleRes: Int, val exampl
+ }
+ 
+ /** Default subfolder under Music/ for offline tracks (Music/LastWave). */
+-const val DEFAULT_DOWNLOAD_FOLDER = "LastWave"
++const val DEFAULT_DOWNLOAD_FOLDER = "AdiMusic"
+ 
+ /** Sanitize a user-entered download folder to a safe single path segment:
+  *  no separators, no traversal, max 40 chars, fallback to default. */
+diff --git a/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt b/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt
+index b6ee317..bcbddd5 100644
+--- a/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt
++++ b/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt
+@@ -149,7 +149,7 @@ class LastWaveLyricsApi @Inject constructor(
+                     isWordSynced = hasWordTiming,
+                     plainLyrics = ttmlLines.joinToString("\n") { it.text },
+                     isInstrumental = false,
+-                    source = if (hasWordTiming) "LastWave (Word-Sync)" else "LastWave (Line-Sync)",
++                    source = if (hasWordTiming) "AdiMusic (Word-Sync)" else "AdiMusic (Line-Sync)",
+                 )
+             }
+         }
+@@ -172,7 +172,7 @@ class LastWaveLyricsApi @Inject constructor(
+                 isWordSynced = false,
+                 plainLyrics = lrcLines.joinToString("\n") { it.text },
+                 isInstrumental = false,
+-                source = "LastWave (Line-Sync)",
++                source = "AdiMusic (Line-Sync)",
+             )
+         }
+ 
+@@ -184,7 +184,7 @@ class LastWaveLyricsApi @Inject constructor(
+                 isWordSynced = false,
+                 plainLyrics = content.trim(),
+                 isInstrumental = false,
+-                source = "LastWave (Plain)",
++                source = "AdiMusic (Plain)",
+             )
+         }
+ 
+diff --git a/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt b/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt
+index f6dce4f..07ab7b8 100644
+--- a/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt
++++ b/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt
+@@ -1127,7 +1127,7 @@ class InnerTubeMusicApi @Inject constructor(
+     suspend fun createRemotePlaylist(title: String): String? = withContext(Dispatchers.IO) {
+         if (!ytAuth.connection.value.isConnected) return@withContext null
+         val cleanTitle = title.replace("<", "(").replace(">", ")").take(150)
+-            .ifBlank { "LastWave Playlist" }
++            .ifBlank { "AdiMusic Playlist" }
+         val config = getWebConfig()
+         val root = runCatching {
+             post(
+diff --git a/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt b/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt
+index 22b806c..6b1c2bb 100644
+--- a/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt
++++ b/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt
+@@ -386,7 +386,7 @@ class PlaylistRepository @Inject constructor(
+             if (entity != null) {
+                 val adopted = entity.copy(
+                     title = LIKED_SONGS_TITLE,
+-                    subtitle = "Songs you like in LastWave",
++                    subtitle = "Songs you like in AdiMusic",
+                     mode = LIKED_SONGS_MODE,
+                     isPinned = true,
+                 )
+@@ -398,7 +398,7 @@ class PlaylistRepository @Inject constructor(
+         }
+         val created = save(
+             title = LIKED_SONGS_TITLE,
+-            subtitle = "Songs you like in LastWave",
++            subtitle = "Songs you like in AdiMusic",
+             mode = LIKED_SONGS_MODE,
+             tracks = emptyList(),
+         )
 diff --git a/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt b/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt
 index d38df5e..748c1c3 100644
 --- a/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt
@@ -110,11 +226,255 @@ index d38df5e..748c1c3 100644
      }
  
      fun isNewerVersion(remote: String, local: String): Boolean {
+diff --git a/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt b/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt
+index 6ff9de6..07760dc 100644
+--- a/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt
++++ b/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt
+@@ -92,10 +92,10 @@ class AuthViewModel @Inject constructor(
+                 _webAuthState.value = WebAuthState.AwaitingApproval(url)
+             }
+             BackupCheck.UnsupportedSchema -> {
+-                _webAuthState.value = WebAuthState.Error("This backup was created by a newer LastWave version")
++                _webAuthState.value = WebAuthState.Error("This backup was created by a newer AdiMusic version")
+             }
+             BackupCheck.Invalid -> {
+-                _webAuthState.value = WebAuthState.Error("That file is not a valid LastWave backup")
++                _webAuthState.value = WebAuthState.Error("That file is not a valid AdiMusic backup")
+             }
+         }
+     }
+@@ -109,11 +109,11 @@ class AuthViewModel @Inject constructor(
+     fun restoreBackupOnly(content: String) {
+         when (backupRepository.checkBackup(content)) {
+             BackupCheck.UnsupportedSchema -> {
+-                _webAuthState.value = WebAuthState.Error("This backup was created by a newer LastWave version")
++                _webAuthState.value = WebAuthState.Error("This backup was created by a newer AdiMusic version")
+                 return
+             }
+             BackupCheck.Invalid -> {
+-                _webAuthState.value = WebAuthState.Error("That file is not a valid LastWave backup")
++                _webAuthState.value = WebAuthState.Error("That file is not a valid AdiMusic backup")
+                 return
+             }
+             is BackupCheck.Valid -> Unit
+@@ -128,10 +128,10 @@ class AuthViewModel @Inject constructor(
+             ) {
+                 is RestoreResult.Success -> WebAuthState.Idle
+                 RestoreResult.UnsupportedSchema -> WebAuthState.Error(
+-                    "This backup was created by a newer LastWave version",
++                    "This backup was created by a newer AdiMusic version",
+                 )
+                 RestoreResult.InvalidFile -> WebAuthState.Error(
+-                    "That file is not a valid LastWave backup",
++                    "That file is not a valid AdiMusic backup",
+                 )
+                 is RestoreResult.Failed -> WebAuthState.Error(restoreResult.message)
+             }
+@@ -166,10 +166,10 @@ class AuthViewModel @Inject constructor(
+                     ) {
+                         is RestoreResult.Success -> WebAuthState.Idle
+                         RestoreResult.UnsupportedSchema -> WebAuthState.Error(
+-                            "This backup was created by a newer LastWave version",
++                            "This backup was created by a newer AdiMusic version",
+                         )
+                         RestoreResult.InvalidFile -> WebAuthState.Error(
+-                            "That file is not a valid LastWave backup",
++                            "That file is not a valid AdiMusic backup",
+                         )
+                         is RestoreResult.Failed -> WebAuthState.Error(restoreResult.message)
+                     }
+diff --git a/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt b/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt
+index 4452191..b63f140 100644
+--- a/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt
+@@ -109,7 +109,7 @@ fun LoginScreen(
+                         )
+                     }
+                 }
+-                Text("LastWave", style = MaterialTheme.typography.headlineMedium)
++                Text("AdiMusic", style = MaterialTheme.typography.headlineMedium)
+                 Text(
+                     "Your music, your way — powered by YouTube Music",
+                     style = MaterialTheme.typography.bodyMedium,
+diff --git a/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt b/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt
+index 3e237f4..650d198 100644
+--- a/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt
++++ b/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt
+@@ -281,7 +281,7 @@ fun TrackContextMenuSheet(
+     capabilities: TrackMenuCapabilities,
+     playableTrack: PlayableTrack? = null,
+     onDismiss: () -> Unit,
+-    playbackSourceLabel: String = "LastWave",
++    playbackSourceLabel: String = "AdiMusic",
+     onPlayInLastWave: (() -> Unit)? = null,
+     onStartMix: ((trackName: String, artistName: String) -> Unit)? = null,
+     onExploreGenre: ((genre: String) -> Unit)? = null,
+diff --git a/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt b/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt
+index 0f324cb..1a55d93 100644
+--- a/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt
++++ b/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt
+@@ -74,7 +74,7 @@ data class TrackMiniTrayData(
+     val album: String? = null,
+     val artworkUrl: String? = null,
+     val videoId: String? = null,
+-    val sourceLabel: String = "LastWave",
++    val sourceLabel: String = "AdiMusic",
+     val onPlay: (() -> Unit)? = null,
+ ) {
+     fun toPlayable(): PlayableTrack = PlayableTrack(
+diff --git a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
+index 5373fd0..8d0442a 100644
+--- a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
++++ b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
+@@ -610,7 +610,7 @@ private fun LaunchGate() {
+                 )
+             }
+             Spacer(Modifier.height(18.dp))
+-            Text("LastWave", style = MaterialTheme.typography.headlineSmall)
++            Text("AdiMusic", style = MaterialTheme.typography.headlineSmall)
+             Spacer(Modifier.height(20.dp))
+             ExpressiveLoadingIndicator(message = "Preparing your music")
+         }
+diff --git a/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt b/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
+index 5443e1f..6d3dcf0 100644
+--- a/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
++++ b/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
+@@ -2164,7 +2164,7 @@ private fun FullPlayer(
+                             if (currentTab == FullPlayerTab.LYRICS) {
+                                 "${track.title} • ${track.artist}"
+                             } else {
+-                                state.sourceLabel.takeIf { it.isNotBlank() } ?: "LastWave"
++                                state.sourceLabel.takeIf { it.isNotBlank() } ?: "AdiMusic"
+                             },
+                             style = MaterialTheme.typography.bodySmall,
+                             color = Color.White.copy(alpha = 0.70f),
+diff --git a/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt b/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt
+index 30b4e67..2d06759 100644
+--- a/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt
++++ b/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt
+@@ -252,7 +252,7 @@ class DownloadsViewModel @Inject constructor(
+             downloadTreeUri.value,
+         )
+ 
+-    /** Human-readable label ("SD card › Music/LastWave"), or null when the
++    /** Human-readable label ("SD card › Music/AdiMusic"), or null when the
+      *  default location is active or the grant was lost. */
+     fun describeCustomLocation(): String? =
+         com.lastwave.app.data.download.SafTreeFiles.describeLocation(
+diff --git a/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt
+index bc0642e..c40de2d 100644
+--- a/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt
+@@ -136,7 +136,7 @@ fun ExternalPlaylistImportScreen(
+                                 fontWeight = FontWeight.Bold,
+                             )
+                             Text(
+-                                "Paste a public Spotify or Apple Music playlist link. LastWave reads every track off the playlist page and matches them to playable songs — no account or API key needed.",
++                                "Paste a public Spotify or Apple Music playlist link. AdiMusic reads every track off the playlist page and matches them to playable songs — no account or API key needed.",
+                                 style = MaterialTheme.typography.bodyMedium,
+                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                             )
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
-index 8620614..6e9b57e 100644
+index 8620614..3518be5 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
-@@ -3611,13 +3611,13 @@ private fun AboutCard(versionName: String) {
+@@ -1305,7 +1305,7 @@ fun SettingsScreen(
+                         else ->
+                             if (!ytConnected) "Connect an account first"
+                             else if (ytSyncEnabled) "Selected playlists mirror to your account, 24/7" + lastSyncSuffix(ytLastSyncAt)
+-                            else "Keep your YT Music library in sync with LastWave"
++                            else "Keep your YT Music library in sync with AdiMusic"
+                     }
+                     // Display name of the active channel: the picked entry when
+                     // the channel list was loaded, otherwise the stored name.
+@@ -1427,9 +1427,9 @@ fun SettingsScreen(
+                                     iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                     title = stringResource(R.string.settings_yt_history),
+                                     subtitle = if (ytHistorySyncEnabled) {
+-                                        "On • songs you listen to in LastWave, including lossless & downloads, appear in your YouTube Music history"
++                                        "On • songs you listen to in AdiMusic, including lossless & downloads, appear in your YouTube Music history"
+                                     } else {
+-                                        "Off • listening in LastWave stays out of your YouTube Music history"
++                                        "Off • listening in AdiMusic stays out of your YouTube Music history"
+                                     },
+                                     checked = ytHistorySyncEnabled,
+                                     onCheckedChange = viewModel::setYtHistorySyncEnabled,
+@@ -1486,7 +1486,7 @@ fun SettingsScreen(
+                         subtitle = if (discordPresenceEnabled) {
+                             "On • your track, quality and cover show on your Discord profile"
+                         } else {
+-                            "Off • LastWave stays off your Discord profile"
++                            "Off • AdiMusic stays off your Discord profile"
+                         },
+                         checked = discordPresenceEnabled,
+                         onCheckedChange = viewModel::setDiscordPresenceEnabled,
+@@ -1662,52 +1662,9 @@ fun SettingsScreen(
+                         item {
+                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                     SectionLabel(stringResource(R.string.settings_section_about))
+-                    SettingsGroup(rowCount = 4) { index, position ->
++                    SettingsGroup(rowCount = 1) { index, position ->
+                         when (index) {
+                             0 -> SettingsActionCard(
+-                                icon = Icons.AutoMirrored.Filled.Send,
+-                                iconContainer = MaterialTheme.colorScheme.primaryContainer,
+-                                iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+-                                title = stringResource(R.string.settings_updates_support),
+-                                subtitle = "Join @clashprojects on Telegram",
+-                                onClick = {
+-                                    if (!openTelegramChannel(context, "clashprojects")) {
+-                                        viewModel.showToast("No compatible browser or Telegram app is available")
+-                                    }
+-                                },
+-                                position = position,
+-                                isHighlighted = (highlightedSettingId == "about.telegram_support"),
+-                            )
+-                            1 -> SettingsActionCard(
+-                                icon = Icons.Filled.Group,
+-                                iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
+-                                iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+-                                title = "Discord Support",
+-                                subtitle = "Join our Discord community",
+-                                onClick = {
+-                                    val discordIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://discord.gg/TMCEPSUNk2"))
+-                                    if (!startActivitySafely(context, discordIntent)) {
+-                                        viewModel.showToast("No compatible browser is available")
+-                                    }
+-                                },
+-                                position = position,
+-                                isHighlighted = (highlightedSettingId == "about.discord_support"),
+-                            )
+-                            2 -> SettingsActionCard(
+-                                icon = Icons.Filled.AutoAwesome,
+-                                iconContainer = MaterialTheme.colorScheme.primaryContainer,
+-                                iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+-                                title = stringResource(R.string.settings_more_from_us),
+-                                subtitle = "Join @MaterialYouApp on Telegram",
+-                                onClick = {
+-                                    if (!openTelegramChannel(context, "MaterialYouApp")) {
+-                                        viewModel.showToast("No compatible browser or Telegram app is available")
+-                                    }
+-                                },
+-                                position = position,
+-                                isHighlighted = (highlightedSettingId == "about.more_apps"),
+-                            )
+-                            3 -> SettingsActionCard(
+                                 icon = Icons.Filled.Code,
+                                 iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                                 iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+@@ -1810,9 +1767,9 @@ fun SettingsScreen(
+                         iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                         iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+                         title = stringResource(R.string.settings_source_code),
+-                        subtitle = "github.com/Clash-Projects/LastWave-native",
++                        subtitle = "github.com/lostingness/AdiMusic",
+                         onClick = {
+-                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Clash-Projects/LastWave-native"))
++                            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/lostingness/AdiMusic"))
+                             if (!startActivitySafely(context, intent)) {
+                                 viewModel.showToast("No browser is available")
+                             }
+@@ -3611,13 +3568,13 @@ private fun AboutCard(versionName: String) {
              ) {
                  Icon(
                      painter = painterResource(R.drawable.ic_launcher_logo),
@@ -130,7 +490,7 @@ index 8620614..6e9b57e 100644
              Spacer(Modifier.height(8.dp))
              Surface(
                  shape = ExpressivePillShape,
-@@ -3638,6 +3638,21 @@ private fun AboutCard(versionName: String) {
+@@ -3638,6 +3595,21 @@ private fun AboutCard(versionName: String) {
                  color = MaterialTheme.colorScheme.onSurfaceVariant,
                  textAlign = TextAlign.Center,
              )
@@ -152,6 +512,79 @@ index 8620614..6e9b57e 100644
          }
      }
  }
+@@ -4365,7 +4337,7 @@ private fun YouTubeChannelSheet(
+                 Column(Modifier.weight(1f)) {
+                     Text("YouTube Channel", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                     Text(
+-                        "Pick which channel's library, likes & history LastWave uses",
++                        "Pick which channel's library, likes & history AdiMusic uses",
+                         style = MaterialTheme.typography.bodySmall,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                     )
+@@ -4527,7 +4499,7 @@ private fun YouTubeLibraryVisibilitySheet(
+                 Column(Modifier.weight(1f)) {
+                     Text("YouTube Playlists Shown", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                     Text(
+-                        "Choose which account playlists appear in LastWave",
++                        "Choose which account playlists appear in AdiMusic",
+                         style = MaterialTheme.typography.bodySmall,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                     )
+diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
+index bf5f52d..bd29df0 100644
+--- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
++++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
+@@ -702,7 +702,7 @@ object SettingsSearchIndex {
+                 SettingsEntry(
+                     id = "youtube.shown_playlists",
+                     title = "Show / Hide Account Playlists",
+-                    subtitle = "Control which playlists from your YouTube account appear in LastWave",
++                    subtitle = "Control which playlists from your YouTube account appear in AdiMusic",
+                     keywords = listOf(
+                         "show playlists", "hide playlists", "visibility", "account playlists",
+                         "library visibility", "filter playlists"
+diff --git a/app/src/main/res/drawable/ic_launcher_foreground.xml b/app/src/main/res/drawable/ic_launcher_foreground.xml
+index 7e40013..eca55e3 100644
+--- a/app/src/main/res/drawable/ic_launcher_foreground.xml
++++ b/app/src/main/res/drawable/ic_launcher_foreground.xml
+@@ -1,27 +1,19 @@
++<?xml version="1.0" encoding="utf-8"?>
+ <vector xmlns:android="http://schemas.android.com/apk/res/android"
+     android:width="108dp"
+     android:height="108dp"
+     android:viewportWidth="108"
+     android:viewportHeight="108">
+-    <!-- Geometry extracted from the official logo (four rounded bars,
+-         tallest second-from-left) and scaled to fit strictly within the
+-         adaptive icon 66dp circular safe zone (radius <= 33dp centered at 54, 54).
+-         This ensures the bars are never clipped by circular launcher masks (72dp
+-         diameter) or Android 12+ splash-screen icon zoom animations (#188).
+-         The fourth bar thickness is normalized to match the rhythm of the other
+-         bars. Paired with @color/ic_launcher_background (the logo's lime) as
+-         the background layer in mipmap-anydpi-v26/ic_launcher.xml, and reused
+-         unmodified as the monochrome (Android 13+ themed icon) layer. -->
++    <!-- AdiMusic launcher glyph: eighth-note, fits strictly within the
++         adaptive-icon 66dp circular safe zone (radius <= 33dp centered
++         at 54,54). Reused unmodified as the monochrome (themed icon) layer. -->
+     <path
+-        android:fillColor="#012226"
+-        android:pathData="M29.70,43.17 A3.58,3.58 0 0 1 36.86,43.17 L36.86,68.24 A3.58,3.58 0 0 1 29.70,68.24 Z" />
++        android:fillColor="#FFFFFF"
++        android:pathData="M34,76 a8,6 0 1,0 16,0 a8,6 0 1,0 -16,0 Z" />
+     <path
+-        android:fillColor="#012226"
+-        android:pathData="M44.02,31.27 A3.68,3.68 0 0 1 51.37,31.27 L51.37,76.73 A3.68,3.68 0 0 1 44.02,76.73 Z" />
++        android:fillColor="#FFFFFF"
++        android:pathData="M49,76 L49,34 L53.5,34 L53.5,76 Z" />
+     <path
+-        android:fillColor="#012226"
+-        android:pathData="M58.18,35.18 A3.74,3.74 0 0 1 65.66,35.18 L65.66,72.09 A3.74,3.74 0 0 1 58.18,72.09 Z" />
+-    <path
+-        android:fillColor="#012226"
+-        android:pathData="M72.48,41.53 A3.74,3.74 0 0 1 79.96,41.53 L79.96,65.72 A3.74,3.74 0 0 1 72.48,65.72 Z" />
++        android:fillColor="#FFFFFF"
++        android:pathData="M49,34 C58,35 66,39 70.5,46 L67,52.5 C63,46 57,42 49,40.5 Z" />
+ </vector>
 diff --git a/app/src/main/res/values-ar/strings.xml b/app/src/main/res/values-ar/strings.xml
 index 1f32b55..52881bb 100644
 --- a/app/src/main/res/values-ar/strings.xml
@@ -536,6 +969,17 @@ index 2a7c146..c3b76e1 100644
      <string name="dialog_logout_title">退出 Last.fm？</string>
      <string name="dialog_logout_text">您的歌单和缓存数据将被保留。</string>
      <string name="common_save">保存</string>
+diff --git a/app/src/main/res/values/colors.xml b/app/src/main/res/values/colors.xml
+index 5d24436..a4caeb7 100644
+--- a/app/src/main/res/values/colors.xml
++++ b/app/src/main/res/values/colors.xml
+@@ -8,5 +8,5 @@
+     <!-- LastWave app icon (Aug 2026 restore): the lime circle behind the
+          four bars in the official logo. Used as the adaptive icon's
+          background layer, paired with ic_launcher_foreground for the bars. -->
+-    <color name="ic_launcher_background">#FFC9FB00</color>
++    <color name="ic_launcher_background">#FF141414</color>
+ </resources>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
 index d04db45..ef8ddcb 100644
 --- a/app/src/main/res/values/strings.xml
