@@ -66,12 +66,12 @@ jobs:
           ./gradlew :app:assembleRelease --stacktrace
 
       - name: Rename APK
-        run: cp source/app/build/outputs/apk/release/app-release.apk AdiMusic-v4.2.8.apk
+        run: cp source/app/build/outputs/apk/release/app-release.apk AdiMusic-v4.2.9.apk
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.2.8-adimusic
-          name: "AdiMusic v4.2.8"
-          body: "AdiMusic v4.2.8 — NEW: Listen Together! Bottom nav mein naya Together tab — room banao ya code se join karo, aur 2 phones par ek hi gaana ek hi time par suno (play/pause/seek/track sab sync). Pehle purana version uninstall karo, phir install karo. Note: Together ko Supabase keys chahiye (SUPABASE_SETUP.md) — bina keys ke tab setup steps dikhayega."
-          files: AdiMusic-v4.2.8.apk
+          tag_name: v4.2.9-adimusic
+          name: "AdiMusic v4.2.9"
+          body: "AdiMusic v4.2.9 — Listen Together FIXED! Together tab — room banao ya code se join karo, aur 2 phones par ek hi gaana ek hi time par suno. Dono taraf se control: kisi bhi phone se play/pause/seek/track badlo, doosre par bhi wahi hoga. Connection fix + error dikhata hai agar connect na ho. Pehle purana version uninstall karo, phir install karo. Note: Together ko Supabase keys chahiye (SUPABASE_SETUP.md) — bina keys ke tab setup steps dikhayega."
+          files: AdiMusic-v4.2.9.apk
