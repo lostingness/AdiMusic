@@ -19,6 +19,13 @@ In the project dashboard → **Project Settings → API**:
 
 - **Project URL** → e.g. `https://abcdefghijklm.supabase.co`
 - **anon / public key** → the long `eyJ...` token labelled `anon public`
+  (in newer dashboards it is under **"Legacy API keys"** — scroll down
+  past the new keys to find it).
+
+> IMPORTANT: use the **legacy `anon` key** (`eyJ...`), NOT the new
+> publishable key (`sb_publishable_...`). The Realtime server validates
+> the key as a JWT — the publishable key is rejected and both phones
+> stay stuck on "Disconnected". This was the v4.2.8 bug.
 
 > The `anon` key is a *public* key by design (it ships inside the app, like
 > any client API key). Never paste the `service_role` key anywhere — it

@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 655dc41..6c2fdb3 100644
+index 655dc41..1b43c9b 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -60,14 +60,21 @@ android {
@@ -8,8 +8,8 @@ index 655dc41..6c2fdb3 100644
          targetSdk = 35
 -        versionCode = 27
 -        versionName = "4.2.7"
-+        versionCode = 28
-+        versionName = "4.2.8"
++        versionCode = 29
++        versionName = "4.2.9"
  
          val lastWaveLyricsToken = resolveSecret("LASTWAVE_LYRICS_TOKEN")
          val lastWaveLyricsUrl = resolveSecret("LASTWAVE_LYRICS_URL")
@@ -62,10 +62,10 @@ index 33b6163..9a36be9 100644
  }
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
 new file mode 100644
-index 0000000..563e2eb
+index 0000000..deaabde
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
-@@ -0,0 +1,439 @@
+@@ -0,0 +1,441 @@
 +package com.lastwave.app.ui.together
 +
 +import androidx.compose.foundation.background
@@ -253,11 +253,13 @@ index 0000000..563e2eb
 +                                style = MaterialTheme.typography.bodyMedium,
 +                                color = MaterialTheme.colorScheme.onSurfaceVariant,
 +                            )
-+                            if (state.hostLeft) {
++                            if (state.lastError != null &&
++                                state.connection !is TogetherConnection.Connected
++                            ) {
 +                                Spacer(Modifier.height(6.dp))
 +                                Text(
-+                                    text = stringResource(R.string.together_host_left),
-+                                    style = MaterialTheme.typography.bodyMedium,
++                                    text = state.lastError,
++                                    style = MaterialTheme.typography.bodySmall,
 +                                    color = MaterialTheme.colorScheme.error,
 +                                )
 +                            }
@@ -507,10 +509,10 @@ index 0000000..563e2eb
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
 new file mode 100644
-index 0000000..9e868cc
+index 0000000..e1a77f7
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
-@@ -0,0 +1,313 @@
+@@ -0,0 +1,326 @@
 +package com.lastwave.app.ui.together
 +
 +import kotlinx.coroutines.CoroutineScope
@@ -603,6 +605,7 @@ index 0000000..9e868cc
 +class TogetherSyncEngine {
 +
 +    var onConnection: ((TogetherConnection) -> Unit)? = null
++    var onError: ((String) -> Unit)? = null
 +    var onRoomState: ((TogetherRoomState) -> Unit)? = null
 +    var onMemberHello: ((TogetherMember) -> Unit)? = null
 +    var onMemberBye: ((TogetherMember) -> Unit)? = null
@@ -746,8 +749,15 @@ index 0000000..9e868cc
 +                        "config" to JsonObject(
 +                            mapOf(
 +                                "broadcast" to JsonObject(
-+                                    mapOf("self" to JsonPrimitive(false))
-+                                )
++                                    mapOf(
++                                        "self" to JsonPrimitive(false),
++                                        "ack" to JsonPrimitive(false),
++                                    )
++                                ),
++                                "presence" to JsonObject(
++                                    mapOf("key" to JsonPrimitive(""))
++                                ),
++                                "private" to JsonPrimitive(false),
 +                            )
 +                        )
 +                    )
@@ -762,12 +772,15 @@ index 0000000..9e868cc
 +            val parsed = runCatching { json.decodeFromString<PhoenixMessage>(text) }.getOrNull() ?: return
 +            when (parsed.event) {
 +                "phx_reply" -> {
-+                    val status = (parsed.payload as? JsonObject)
++                    val payloadObj = parsed.payload as? JsonObject
++                    val status = payloadObj
 +                        ?.get("status")?.jsonPrimitive?.content
 +                    if (status == "ok") {
 +                        reconnectAttempts = 0
 +                        onConnection?.invoke(TogetherConnection.Connected)
 +                    } else {
++                        val response = payloadObj?.get("response")?.toString() ?: ""
++                        onError?.invoke("Join rejected by server $response")
 +                        onConnection?.invoke(
 +                            TogetherConnection.Failed("Could not join room")
 +                        )
@@ -793,6 +806,7 @@ index 0000000..9e868cc
 +                    }
 +                }
 +                "phx_close", "phx_error" -> {
++                    onError?.invoke("Channel closed by server")
 +                    onConnection?.invoke(TogetherConnection.Disconnected)
 +                    scheduleReconnect()
 +                }
@@ -809,6 +823,7 @@ index 0000000..9e868cc
 +
 +        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
 +            heartbeatJob?.cancel()
++            onError?.invoke(t.message ?: "Connection failed")
 +            if (shouldStayConnected) {
 +                onConnection?.invoke(TogetherConnection.Disconnected)
 +                scheduleReconnect()
@@ -826,10 +841,10 @@ index 0000000..9e868cc
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
 new file mode 100644
-index 0000000..f0a3a0e
+index 0000000..27c937d
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
-@@ -0,0 +1,369 @@
+@@ -0,0 +1,391 @@
 +package com.lastwave.app.ui.together
 +
 +import android.content.Context
@@ -860,7 +875,7 @@ index 0000000..f0a3a0e
 +    val connection: TogetherConnection = TogetherConnection.Disconnected,
 +    val members: List<TogetherMember> = emptyList(),
 +    val roomTrack: TogetherRoomState? = null,
-+    val hostLeft: Boolean = false,
++    val lastError: String? = null,
 +    val autoSync: Boolean = true,
 +    val error: String? = null,
 +    val copied: Boolean = false,
@@ -908,6 +923,8 @@ index 0000000..f0a3a0e
 +    private var pendingSeekMs: Long? = null
 +    private var pendingVideoId: String? = null
 +    private var pendingSeekSetAtMs: Long = 0L
++    private var lastAppliedState: TogetherRoomState? = null
++    private var lastBroadcastState: TogetherRoomState? = null
 +    private var lastHostPositionMs: Long = 0L
 +    private var lastHostEmittedAtMs: Long = 0L
 +    private var lastBroadcastVideoId: String? = null
@@ -916,14 +933,20 @@ index 0000000..f0a3a0e
 +
 +    init {
 +        engine.onConnection = { connection ->
-+            _uiState.update { it.copy(connection = connection) }
++            _uiState.update {
++                it.copy(
++                    connection = connection,
++                    lastError = if (connection is TogetherConnection.Connected) null else it.lastError,
++                )
++            }
 +            if (connection is TogetherConnection.Connected) {
 +                val state = _uiState.value
 +                engine.sendHello(TogetherMember(selfId, state.username, state.isHost))
-+                if (!state.isHost) {
-+                    engine.sendStateRequest(TogetherMember(selfId, state.username, false))
-+                }
++                engine.sendStateRequest(TogetherMember(selfId, state.username, state.isHost))
 +            }
++        }
++        engine.onError = { message ->
++            _uiState.update { it.copy(lastError = message) }
 +        }
 +        engine.onRoomState = { roomState -> onRoomStateReceived(roomState) }
 +        engine.onMemberHello = { member ->
@@ -933,20 +956,14 @@ index 0000000..f0a3a0e
 +            }
 +        }
 +        engine.onMemberBye = { member ->
++            // Any member may leave; the room keeps working for everyone else.
 +            _uiState.update { state ->
-+                state.copy(
-+                    members = state.members.filterNot { it.id == member.id },
-+                    hostLeft = if (member.isHost) true else state.hostLeft,
-+                    connection = if (member.isHost && !state.isHost) {
-+                        TogetherConnection.Disconnected
-+                    } else {
-+                        state.connection
-+                    },
-+                )
++                state.copy(members = state.members.filterNot { it.id == member.id })
 +            }
 +        }
 +        engine.onStateRequested = { _ ->
-+            if (_uiState.value.isHost) broadcastCurrentState()
++            // Anyone in the room can answer a state request with a fresh snapshot.
++            if (_uiState.value.inRoom) broadcastCurrentState()
 +        }
 +        observePlayer()
 +        startHeartbeat()
@@ -989,7 +1006,7 @@ index 0000000..f0a3a0e
 +                roomCode = code,
 +                isHost = true,
 +                members = listOf(TogetherMember(selfId, username, true)),
-+                hostLeft = false,
++                lastError = null,
 +                error = null,
 +            )
 +        }
@@ -1019,7 +1036,7 @@ index 0000000..f0a3a0e
 +                roomCode = code,
 +                isHost = false,
 +                members = listOf(TogetherMember(selfId, username, false)),
-+                hostLeft = false,
++                lastError = null,
 +                error = null,
 +            )
 +        }
@@ -1038,7 +1055,7 @@ index 0000000..f0a3a0e
 +                isHost = false,
 +                members = emptyList(),
 +                roomTrack = null,
-+                hostLeft = false,
++                lastError = null,
 +                error = null,
 +            )
 +        }
@@ -1075,13 +1092,16 @@ index 0000000..f0a3a0e
 +        }
 +    }
 +
-+    /** Host: watch the shared player and broadcast every meaningful change. */
++    /** Every member watches the shared player and broadcasts each change,
++     *  so playback control works from EITHER device. Echo suppression
++     *  (see [statesMatch]) stops applied remote states from bouncing
++     *  back and forth forever. */
 +    private fun observePlayer() {
 +        viewModelScope.launch {
 +            musicPlayer.state.collect { player ->
 +                val state = _uiState.value
-+                // Joiner: apply a pending seek once the room track is loaded.
-+                if (!state.isHost && pendingSeekMs != null) {
++                // Apply a pending seek once the room track is loaded.
++                if (pendingSeekMs != null) {
 +                    val target = pendingVideoId
 +                    if (target != null && player.current?.videoId == target) {
 +                        val seekTo = pendingSeekMs
@@ -1095,7 +1115,7 @@ index 0000000..f0a3a0e
 +                        pendingVideoId = null
 +                    }
 +                }
-+                if (!state.inRoom || !state.isHost) return@collect
++                if (!state.inRoom) return@collect
 +                val videoId = player.current?.videoId
 +                if (videoId != lastBroadcastVideoId || player.isPlaying != lastBroadcastPlaying) {
 +                    lastBroadcastVideoId = videoId
@@ -1116,7 +1136,7 @@ index 0000000..f0a3a0e
 +        }
 +    }
 +
-+    /** Host: heartbeat keeps joiners aligned even without other changes. */
++    /** Heartbeat keeps all members aligned even without other changes. */
 +    private fun startHeartbeat() {
 +        if (heartbeatStarted) return
 +        heartbeatStarted = true
@@ -1124,7 +1144,7 @@ index 0000000..f0a3a0e
 +            while (true) {
 +                kotlinx.coroutines.delay(3_000)
 +                val state = _uiState.value
-+                if (state.inRoom && state.isHost && state.connection is TogetherConnection.Connected) {
++                if (state.inRoom && state.connection is TogetherConnection.Connected) {
 +                    broadcastCurrentState()
 +                }
 +            }
@@ -1133,7 +1153,7 @@ index 0000000..f0a3a0e
 +
 +    private fun broadcastCurrentState(playerPositionMs: Long? = null) {
 +        val state = _uiState.value
-+        if (!state.inRoom || !state.isHost) return
++        if (!state.inRoom) return
 +        val player = musicPlayer.state.value
 +        val roomState = TogetherRoomState(
 +            trackVideoId = player.current?.videoId,
@@ -1146,10 +1166,23 @@ index 0000000..f0a3a0e
 +            updatedAtMs = System.currentTimeMillis(),
 +            senderId = selfId,
 +            senderName = state.username,
-+            isHost = true,
++            isHost = state.isHost,
 +        )
++        // Echo suppression: this change came from a remote state we just
++        // applied, so re-broadcasting it would ping-pong forever.
++        if (statesMatch(roomState, lastAppliedState)) return
 +        _uiState.update { it.copy(roomTrack = roomState) }
++        lastBroadcastState = roomState
 +        engine.sendState(roomState)
++    }
++
++    /** Two snapshots count as the same moment when track + play state match
++     *  and positions are within 2 seconds of each other. */
++    private fun statesMatch(a: TogetherRoomState, b: TogetherRoomState?): Boolean {
++        if (b == null) return false
++        return a.trackVideoId == b.trackVideoId &&
++            a.playing == b.playing &&
++            kotlin.math.abs(a.positionMs - b.positionMs) < 2_000
 +    }
 +
 +    /** Joiner: apply the host's snapshot to the shared player. */
@@ -1157,8 +1190,12 @@ index 0000000..f0a3a0e
 +        if (roomState.senderId == selfId) return
 +        _uiState.update { it.copy(roomTrack = roomState) }
 +        val state = _uiState.value
-+        if (state.isHost || !state.inRoom) return
++        if (!state.inRoom) return
++        // Echo suppression: this is our own state bounced back through
++        // the other device after it applied it.
++        if (statesMatch(roomState, lastBroadcastState)) return
 +        if (!state.autoSync) return
++        lastAppliedState = roomState
 +        val videoId = roomState.trackVideoId ?: return
 +        viewModelScope.launch(Dispatchers.Main) {
 +            val local = musicPlayer.state.value
@@ -1200,7 +1237,7 @@ index 0000000..f0a3a0e
 +    }
 +}
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index ef8ddcb..b519608 100644
+index ef8ddcb..b8ad688 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -328,4 +328,39 @@
@@ -1226,8 +1263,8 @@ index ef8ddcb..b519608 100644
 +    <string name="together_reconnect">Reconnect</string>
 +    <string name="together_copy_code">Copy code</string>
 +    <string name="together_copied">Code copied</string>
-+    <string name="together_you_are_host">You are the host — your playback controls the room</string>
-+    <string name="together_following">Following the host</string>
++    <string name="together_you_are_host">You created this room — anyone here can control playback</string>
++    <string name="together_following">In sync — anyone here can control playback</string>
 +    <string name="together_now_playing">Now playing in this room</string>
 +    <string name="together_no_track">Nothing playing yet</string>
 +    <string name="together_members">In this room</string>
