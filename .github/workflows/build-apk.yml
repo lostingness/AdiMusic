@@ -24,7 +24,6 @@ jobs:
           cd source
           git checkout b6db40a7257c61636cda9694c0dd2774bcd1cb5c
 
-
       - name: Apply AdiMusic rebrand patch
         run: |
           set -e
@@ -33,6 +32,13 @@ jobs:
           git apply ../adimusic/rebrand.patch
           echo "--- app_name after patch:"
           grep -m1 'string name="app_name"' app/src/main/res/values/strings.xml
+
+      - name: Apply Listen Together patch
+        run: |
+          set -e
+          cd source
+          git apply --check ../adimusic/rebrand-together.patch
+          git apply ../adimusic/rebrand-together.patch
 
       - name: Install AdiMusic launcher icon
         run: |
@@ -52,17 +58,20 @@ jobs:
 
       - name: Build release APK
         working-directory: source
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           chmod +x gradlew
           ./gradlew :app:assembleRelease --stacktrace
 
       - name: Rename APK
-        run: cp source/app/build/outputs/apk/release/app-release.apk AdiMusic-v4.2.7.apk
+        run: cp source/app/build/outputs/apk/release/app-release.apk AdiMusic-v4.2.8.apk
 
       - name: Create GitHub Release with APK
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v4.2.7-adimusic
-          name: "AdiMusic v4.2.7"
-          body: "AdiMusic v4.2.7 — naye defaults (AMOLED/Liquid Glass on), About mein developer info, like button animation, playlist mein Spotify import button. Pehle purana version uninstall karo, phir install karo."
-          files: AdiMusic-v4.2.7.apk
+          tag_name: v4.2.8-adimusic
+          name: "AdiMusic v4.2.8"
+          body: "AdiMusic v4.2.8 — NEW: Listen Together! Bottom nav mein naya Together tab — room banao ya code se join karo, aur 2 phones par ek hi gaana ek hi time par suno (play/pause/seek/track sab sync). Pehle purana version uninstall karo, phir install karo. Note: Together ko Supabase keys chahiye (SUPABASE_SETUP.md) — bina keys ke tab setup steps dikhayega."
+          files: AdiMusic-v4.2.8.apk
