@@ -602,10 +602,10 @@ index 0000000..4796a87
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
 new file mode 100644
-index 0000000..9718f18
+index 0000000..b1496de
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
-@@ -0,0 +1,363 @@
+@@ -0,0 +1,364 @@
 +package com.lastwave.app.ui.together
 +
 +import kotlinx.coroutines.CoroutineScope
@@ -681,6 +681,7 @@ index 0000000..9718f18
 +    val updatedAtMs: Long = 0L,
 +    val senderId: String = "",
 +)
++sealed interface TogetherConnection {
 +    data object Disconnected : TogetherConnection
 +    data object Connecting : TogetherConnection
 +    data object Connected : TogetherConnection
