@@ -62,10 +62,10 @@ index 33b6163..9a36be9 100644
  }
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
 new file mode 100644
-index 0000000..deaabde
+index 0000000..bd6d052
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
-@@ -0,0 +1,441 @@
+@@ -0,0 +1,442 @@
 +package com.lastwave.app.ui.together
 +
 +import androidx.compose.foundation.background
@@ -253,12 +253,13 @@ index 0000000..deaabde
 +                                style = MaterialTheme.typography.bodyMedium,
 +                                color = MaterialTheme.colorScheme.onSurfaceVariant,
 +                            )
-+                            if (state.lastError != null &&
++                            val lastError = state.lastError
++                            if (lastError != null &&
 +                                state.connection !is TogetherConnection.Connected
 +                            ) {
 +                                Spacer(Modifier.height(6.dp))
 +                                Text(
-+                                    text = state.lastError,
++                                    text = lastError,
 +                                    style = MaterialTheme.typography.bodySmall,
 +                                    color = MaterialTheme.colorScheme.error,
 +                                )
