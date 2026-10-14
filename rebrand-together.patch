@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 655dc41..caceecf 100644
+index 655dc41..f58a2dc 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -60,14 +60,21 @@ android {
@@ -8,8 +8,8 @@ index 655dc41..caceecf 100644
          targetSdk = 35
 -        versionCode = 27
 -        versionName = "4.2.7"
-+        versionCode = 30
-+        versionName = "4.2.10"
++        versionCode = 31
++        versionName = "4.2.11"
  
          val lastWaveLyricsToken = resolveSecret("LASTWAVE_LYRICS_TOKEN")
          val lastWaveLyricsUrl = resolveSecret("LASTWAVE_LYRICS_URL")
@@ -62,13 +62,14 @@ index 33b6163..9a36be9 100644
  }
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
 new file mode 100644
-index 0000000..bd6d052
+index 0000000..4796a87
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
-@@ -0,0 +1,442 @@
+@@ -0,0 +1,534 @@
 +package com.lastwave.app.ui.together
 +
 +import androidx.compose.foundation.background
++import androidx.compose.foundation.clickable
 +import androidx.compose.foundation.layout.Arrangement
 +import androidx.compose.foundation.layout.Box
 +import androidx.compose.foundation.layout.Column
@@ -85,9 +86,13 @@ index 0000000..bd6d052
 +import androidx.compose.foundation.shape.RoundedCornerShape
 +import androidx.compose.foundation.verticalScroll
 +import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.Close
 +import androidx.compose.material.icons.filled.ContentCopy
 +import androidx.compose.material.icons.filled.Group
 +import androidx.compose.material.icons.filled.MusicNote
++import androidx.compose.material.icons.filled.PlayArrow
++import androidx.compose.material3.IconButton
++import androidx.compose.material3.TextButton
 +import androidx.compose.material3.Button
 +import androidx.compose.material3.Card
 +import androidx.compose.material3.CardDefaults
@@ -380,6 +385,93 @@ index 0000000..bd6d052
 +                    }
 +                }
 +
++                // ---- room playlist (shared, keyed by room code only) ----
++                if (state.inRoom) {
++                    Card(modifier = Modifier.fillMaxWidth()) {
++                        Column(Modifier.padding(16.dp)) {
++                            Row(verticalAlignment = Alignment.CenterVertically) {
++                                Text(
++                                    text = stringResource(R.string.together_playlist_title),
++                                    style = MaterialTheme.typography.titleSmall,
++                                    fontWeight = FontWeight.SemiBold,
++                                    modifier = Modifier.weight(1f),
++                                )
++                                Text(
++                                    text = state.roomPlaylist.size.toString(),
++                                    style = MaterialTheme.typography.bodyMedium,
++                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                )
++                            }
++                            Spacer(Modifier.height(10.dp))
++                            OutlinedButton(
++                                onClick = { viewModel.addCurrentSongToPlaylist() },
++                                modifier = Modifier.fillMaxWidth(),
++                            ) {
++                                Text(stringResource(R.string.together_playlist_add_current))
++                            }
++                            if (state.roomPlaylist.isEmpty()) {
++                                Spacer(Modifier.height(8.dp))
++                                Text(
++                                    text = stringResource(R.string.together_playlist_empty),
++                                    style = MaterialTheme.typography.bodyMedium,
++                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                )
++                            } else {
++                                Spacer(Modifier.height(8.dp))
++                                state.roomPlaylist.forEachIndexed { index, item ->
++                                    Row(
++                                        verticalAlignment = Alignment.CenterVertically,
++                                        modifier = Modifier
++                                            .fillMaxWidth()
++                                            .clickable { viewModel.playRoomPlaylistItem(item.videoId) }
++                                            .padding(vertical = 6.dp),
++                                    ) {
++                                        Text(
++                                            text = "${index + 1}.",
++                                            style = MaterialTheme.typography.bodyMedium,
++                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                            modifier = Modifier.width(28.dp),
++                                        )
++                                        Column(Modifier.weight(1f)) {
++                                            Text(
++                                                text = item.title,
++                                                style = MaterialTheme.typography.bodyMedium,
++                                                fontWeight = FontWeight.SemiBold,
++                                                maxLines = 1,
++                                            )
++                                            Text(
++                                                text = item.artist,
++                                                style = MaterialTheme.typography.bodySmall,
++                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                                maxLines = 1,
++                                            )
++                                        }
++                                        IconButton(
++                                            onClick = { viewModel.playRoomPlaylistItem(item.videoId) },
++                                        ) {
++                                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
++                                        }
++                                        IconButton(
++                                            onClick = { viewModel.removeFromRoomPlaylist(item.videoId) },
++                                        ) {
++                                            Icon(
++                                                Icons.Filled.Close,
++                                                contentDescription = stringResource(R.string.together_playlist_remove),
++                                            )
++                                        }
++                                    }
++                                }
++                                TextButton(
++                                    onClick = { viewModel.clearRoomPlaylist() },
++                                    modifier = Modifier.fillMaxWidth(),
++                                ) {
++                                    Text(stringResource(R.string.together_playlist_clear))
++                                }
++                            }
++                        }
++                    }
++                }
++
 +                // ---- create / join ----
 +                if (!state.inRoom) {
 +                    Card(modifier = Modifier.fillMaxWidth()) {
@@ -510,10 +602,10 @@ index 0000000..bd6d052
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
 new file mode 100644
-index 0000000..fe58180
+index 0000000..9718f18
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
-@@ -0,0 +1,326 @@
+@@ -0,0 +1,363 @@
 +package com.lastwave.app.ui.together
 +
 +import kotlinx.coroutines.CoroutineScope
@@ -567,7 +659,28 @@ index 0000000..fe58180
 +    val isHost: Boolean = false,
 +)
 +
-+sealed interface TogetherConnection {
++@Serializable
++data class TogetherPlaylistItem(
++    val videoId: String = "",
++    val title: String = "",
++    val artist: String = "",
++    val artworkUrl: String? = null,
++    val durationMs: Long = 0L,
++    val addedBy: String = "",
++)
++
++/**
++ * The room's shared playlist. Keyed by the room code only — there is no
++ * room name. The list is broadcast whole on every change (lists are small)
++ * and receivers adopt the newest snapshot by [updatedAtMs]. It lives only
++ * while the room is alive: when everyone leaves, it is gone.
++ */
++@Serializable
++data class TogetherPlaylistState(
++    val items: List<TogetherPlaylistItem> = emptyList(),
++    val updatedAtMs: Long = 0L,
++    val senderId: String = "",
++)
 +    data object Disconnected : TogetherConnection
 +    data object Connecting : TogetherConnection
 +    data object Connected : TogetherConnection
@@ -611,6 +724,7 @@ index 0000000..fe58180
 +    var onMemberHello: ((TogetherMember) -> Unit)? = null
 +    var onMemberBye: ((TogetherMember) -> Unit)? = null
 +    var onStateRequested: ((TogetherMember) -> Unit)? = null
++    var onPlaylist: ((TogetherPlaylistState) -> Unit)? = null
 +
 +    private val json = Json { ignoreUnknownKeys = true }
 +    private val client = OkHttpClient()
@@ -636,6 +750,9 @@ index 0000000..fe58180
 +    }
 +
 +    private fun dial() {
++        // A pending reconnect timer must never fire after we already dialled:
++        // it used to close the healthy socket and loop Connected/Disconnected.
++        reconnectJob?.cancel()
 +        disconnectSocketOnly()
 +        val host = lastUrl
 +            .removePrefix("https://")
@@ -680,6 +797,10 @@ index 0000000..fe58180
 +
 +    fun sendStateRequest(member: TogetherMember) {
 +        sendBroadcast("together_request", json.encodeToString(member))
++    }
++
++    fun sendPlaylist(state: TogetherPlaylistState) {
++        sendBroadcast("together_playlist", json.encodeToString(state))
 +    }
 +
 +    private fun sendBroadcast(event: String, payloadJson: String) {
@@ -727,12 +848,10 @@ index 0000000..fe58180
 +
 +    private fun scheduleReconnect() {
 +        if (!shouldStayConnected) return
-+        if (reconnectAttempts >= 5) {
-+            onConnection?.invoke(TogetherConnection.Failed("Connection lost"))
-+            return
-+        }
++        // Keep retrying on flaky mobile networks: never give up and strand
++        // the room on Disconnected. Backoff caps at 30s; a dial is cheap.
 +        val attempt = reconnectAttempts++
-+        val delayMs = minOf(2_000L shl attempt, 30_000L)
++        val delayMs = minOf(2_000L shl minOf(attempt, 4), 30_000L)
 +        reconnectJob?.cancel()
 +        reconnectJob = scope.launch {
 +            delay(delayMs)
@@ -770,6 +889,10 @@ index 0000000..fe58180
 +        }
 +
 +        override fun onMessage(webSocket: WebSocket, text: String) {
++            // Ignore events from a stale socket: after a reconnect the old
++            // socket can still deliver/close late, and acting on it used to
++            // tear down the healthy connection.
++            if (webSocket !== socket) return
 +            val parsed = runCatching { json.decodeFromString<PhoenixMessage>(text) }.getOrNull() ?: return
 +            when (parsed.event) {
 +                "phx_reply" -> {
@@ -778,6 +901,7 @@ index 0000000..fe58180
 +                        ?.get("status")?.jsonPrimitive?.content
 +                    if (status == "ok") {
 +                        reconnectAttempts = 0
++                        reconnectJob?.cancel()
 +                        onConnection?.invoke(TogetherConnection.Connected)
 +                    } else {
 +                        val response = payloadObj?.get("response")?.toString() ?: ""
@@ -804,6 +928,9 @@ index 0000000..fe58180
 +                        "together_request" -> runCatching {
 +                            onStateRequested?.invoke(json.decodeFromJsonElement(TogetherMember.serializer(), payload))
 +                        }
++                        "together_playlist" -> runCatching {
++                            onPlaylist?.invoke(json.decodeFromJsonElement(TogetherPlaylistState.serializer(), payload))
++                        }
 +                    }
 +                }
 +                "phx_close", "phx_error" -> {
@@ -815,6 +942,7 @@ index 0000000..fe58180
 +        }
 +
 +        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
++            if (webSocket !== socket) return
 +            heartbeatJob?.cancel()
 +            if (shouldStayConnected) {
 +                onConnection?.invoke(TogetherConnection.Disconnected)
@@ -823,6 +951,7 @@ index 0000000..fe58180
 +        }
 +
 +        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
++            if (webSocket !== socket) return
 +            heartbeatJob?.cancel()
 +            onError?.invoke(t.message ?: "Connection failed")
 +            if (shouldStayConnected) {
@@ -842,10 +971,10 @@ index 0000000..fe58180
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
 new file mode 100644
-index 0000000..27c937d
+index 0000000..ef6831e
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
-@@ -0,0 +1,391 @@
+@@ -0,0 +1,494 @@
 +package com.lastwave.app.ui.together
 +
 +import android.content.Context
@@ -876,6 +1005,7 @@ index 0000000..27c937d
 +    val connection: TogetherConnection = TogetherConnection.Disconnected,
 +    val members: List<TogetherMember> = emptyList(),
 +    val roomTrack: TogetherRoomState? = null,
++    val roomPlaylist: List<TogetherPlaylistItem> = emptyList(),
 +    val lastError: String? = null,
 +    val autoSync: Boolean = true,
 +    val error: String? = null,
@@ -891,13 +1021,15 @@ index 0000000..27c937d
 +private const val DRIFT_TOLERANCE_MS = 600L
 +
 +/**
-+ * Owns the Together room: creating/joining, broadcasting the host's playback,
-+ * applying the host's state as a joiner, drift correction and reconnects.
++ * Owns the Together room: creating/joining, broadcasting each member's
++ * playback, applying remote state, drift correction and reconnects.
 + *
-+ * Only the host broadcasts. Joiners apply host state and never echo it back,
-+ * so there is no feedback loop. The shared [MusicPlayer] is reused — joining
-+ * a room replaces local playback with the room's track, exactly like tapping
-+ * any other track in the app.
++ * Sync is bidirectional: any member can control playback and the rest
++ * follow. Echo suppression ([statesMatch]) plus the broadcast gates in
++ * [broadcastCurrentState] stop applied states and local failures from
++ * bouncing back and forth. The shared [MusicPlayer] is reused — joining
++ * a room replaces local playback with the room's track, exactly like
++ * tapping any other track in the app.
 + */
 +@HiltViewModel
 +class TogetherViewModel @Inject constructor(
@@ -926,6 +1058,8 @@ index 0000000..27c937d
 +    private var pendingSeekSetAtMs: Long = 0L
 +    private var lastAppliedState: TogetherRoomState? = null
 +    private var lastBroadcastState: TogetherRoomState? = null
++    private var playlistUpdatedAtMs: Long = 0L
++    private var suppressBroadcastUntilMs: Long = 0L
 +    private var lastHostPositionMs: Long = 0L
 +    private var lastHostEmittedAtMs: Long = 0L
 +    private var lastBroadcastVideoId: String? = null
@@ -966,6 +1100,7 @@ index 0000000..27c937d
 +            // Anyone in the room can answer a state request with a fresh snapshot.
 +            if (_uiState.value.inRoom) broadcastCurrentState()
 +        }
++        engine.onPlaylist = { playlist -> onPlaylistReceived(playlist) }
 +        observePlayer()
 +        startHeartbeat()
 +    }
@@ -1056,10 +1191,90 @@ index 0000000..27c937d
 +                isHost = false,
 +                members = emptyList(),
 +                roomTrack = null,
++                roomPlaylist = emptyList(),
 +                lastError = null,
 +                error = null,
 +            )
 +        }
++        playlistUpdatedAtMs = 0L
++        suppressBroadcastUntilMs = 0L
++    }
++
++    /** Room playlist: shared queue keyed by the room code only (no room
++     *  name). Anyone in the room can add the song that is playing, play a
++     *  queued song for everyone, or remove/clear entries. */
++    fun addCurrentSongToPlaylist() {
++        val state = _uiState.value
++        if (!state.inRoom) return
++        val current = musicPlayer.state.value.current
++        if (current?.videoId == null) {
++            _uiState.update { it.copy(error = "Nothing playing to add") }
++            return
++        }
++        if (state.roomPlaylist.any { it.videoId == current.videoId }) {
++            _uiState.update { it.copy(error = "Already in playlist") }
++            return
++        }
++        val item = TogetherPlaylistItem(
++            videoId = current.videoId,
++            title = current.title,
++            artist = current.artist,
++            artworkUrl = current.artworkUrl,
++            durationMs = current.durationMs ?: 0L,
++            addedBy = state.username,
++        )
++        updatePlaylist(state.roomPlaylist + item, error = null)
++    }
++
++    fun removeFromRoomPlaylist(videoId: String) {
++        val state = _uiState.value
++        if (!state.inRoom) return
++        updatePlaylist(state.roomPlaylist.filterNot { it.videoId == videoId }, error = null)
++    }
++
++    fun clearRoomPlaylist() {
++        val state = _uiState.value
++        if (!state.inRoom) return
++        updatePlaylist(emptyList(), error = null)
++    }
++
++    fun playRoomPlaylistItem(videoId: String) {
++        val item = _uiState.value.roomPlaylist.firstOrNull { it.videoId == videoId } ?: return
++        viewModelScope.launch(Dispatchers.Main) {
++            musicPlayer.play(
++                PlayableTrack(
++                    title = item.title,
++                    artist = item.artist,
++                    artworkUrl = item.artworkUrl,
++                    videoId = item.videoId,
++                    durationMs = item.durationMs.takeIf { it > 0 },
++                ),
++                sourceLabel = "Together",
++                startRadio = false,
++            )
++        }
++    }
++
++    private fun updatePlaylist(items: List<TogetherPlaylistItem>, error: String?) {
++        val now = System.currentTimeMillis()
++        playlistUpdatedAtMs = now
++        _uiState.update { it.copy(roomPlaylist = items, error = error) }
++        engine.sendPlaylist(
++            TogetherPlaylistState(
++                items = items,
++                updatedAtMs = now,
++                senderId = selfId,
++            )
++        )
++    }
++
++    private fun onPlaylistReceived(playlist: TogetherPlaylistState) {
++        if (playlist.senderId == selfId) return
++        if (!_uiState.value.inRoom) return
++        // Last-write-wins: ignore stale snapshots.
++        if (playlist.updatedAtMs < playlistUpdatedAtMs) return
++        playlistUpdatedAtMs = playlist.updatedAtMs
++        _uiState.update { it.copy(roomPlaylist = playlist.items) }
 +    }
 +
 +    fun reconnect() {
@@ -1106,10 +1321,19 @@ index 0000000..27c937d
 +                    val target = pendingVideoId
 +                    if (target != null && player.current?.videoId == target) {
 +                        val seekTo = pendingSeekMs
-+                        pendingSeekMs = null
-+                        pendingVideoId = null
 +                        if (seekTo != null) {
-+                            viewModelScope.launch(Dispatchers.Main) { musicPlayer.seekTo(seekTo) }
++                            // Hold broadcasts until the catch-up seek lands,
++                            // otherwise this device broadcasts "position ~0"
++                            // and drags the other device back to the start.
++                            suppressBroadcastUntilMs = System.currentTimeMillis() + 2_000
++                            viewModelScope.launch(Dispatchers.Main) {
++                                musicPlayer.seekTo(seekTo)
++                                pendingSeekMs = null
++                                pendingVideoId = null
++                            }
++                        } else {
++                            pendingSeekMs = null
++                            pendingVideoId = null
 +                        }
 +                    } else if (System.currentTimeMillis() - pendingSeekSetAtMs > 10_000) {
 +                        pendingSeekMs = null
@@ -1155,7 +1379,14 @@ index 0000000..27c937d
 +    private fun broadcastCurrentState(playerPositionMs: Long? = null) {
 +        val state = _uiState.value
 +        if (!state.inRoom) return
++        // Gates: a device must never drag the room down with its own
++        // local trouble — a failed stream, a watch-only member, or a
++        // still-catching-up seek all stay local until they are real.
++        if (!state.autoSync) return
++        if (System.currentTimeMillis() < suppressBroadcastUntilMs) return
++        if (pendingSeekMs != null) return
 +        val player = musicPlayer.state.value
++        if (player.error != null) return
 +        val roomState = TogetherRoomState(
 +            trackVideoId = player.current?.videoId,
 +            title = player.current?.title,
@@ -1211,6 +1442,7 @@ index 0000000..27c937d
 +                pendingVideoId = videoId
 +                pendingSeekMs = expectedPosition(roomState)
 +                pendingSeekSetAtMs = System.currentTimeMillis()
++                suppressBroadcastUntilMs = System.currentTimeMillis() + 2_000
 +                musicPlayer.play(track, sourceLabel = "Together", startRadio = false)
 +                if (roomState.playing) musicPlayer.resume() else musicPlayer.pause()
 +            } else {
@@ -1238,10 +1470,10 @@ index 0000000..27c937d
 +    }
 +}
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index ef8ddcb..b8ad688 100644
+index ef8ddcb..dfecd54 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
-@@ -328,4 +328,39 @@
+@@ -328,4 +328,44 @@
      <string name="settings_search_no_results_sub">Try checking for typos or searching with different keywords</string>
      <string name="settings_search_clear">Clear search</string>
      <string name="settings_search_title">Search settings</string>
@@ -1266,6 +1498,11 @@ index ef8ddcb..b8ad688 100644
 +    <string name="together_copied">Code copied</string>
 +    <string name="together_you_are_host">You created this room — anyone here can control playback</string>
 +    <string name="together_following">In sync — anyone here can control playback</string>
++    <string name="together_playlist_title">Room playlist</string>
++    <string name="together_playlist_add_current">Add current song</string>
++    <string name="together_playlist_empty">Playlist is empty — add the song that is playing.</string>
++    <string name="together_playlist_clear">Clear playlist</string>
++    <string name="together_playlist_remove">Remove from playlist</string>
 +    <string name="together_now_playing">Now playing in this room</string>
 +    <string name="together_no_track">Nothing playing yet</string>
 +    <string name="together_members">In this room</string>
