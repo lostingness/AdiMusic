@@ -62,10 +62,10 @@ index 33b6163..9a36be9 100644
  }
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
 new file mode 100644
-index 0000000..f49508a
+index 0000000..563e2eb
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
-@@ -0,0 +1,440 @@
+@@ -0,0 +1,439 @@
 +package com.lastwave.app.ui.together
 +
 +import androidx.compose.foundation.background
@@ -154,8 +154,7 @@ index 0000000..f49508a
 +                .fillMaxSize()
 +                .adaptiveContentWidth(maxWidth = 760.dp)
 +                .verticalScroll(rememberScrollState())
-+                .safeDrawingBottomPadding()
-+                .padding(bottom = FloatingNavDefaults.ContentBottomPadding),
++                .padding(bottom = FloatingNavDefaults.ContentBottomPadding + safeDrawingBottomPadding()),
 +        ) {
 +            ExpressiveHeader(
 +                title = stringResource(R.string.nav_together),
@@ -508,7 +507,7 @@ index 0000000..f49508a
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
 new file mode 100644
-index 0000000..f235fd9
+index 0000000..9e868cc
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
 @@ -0,0 +1,313 @@
@@ -780,16 +779,16 @@ index 0000000..f235fd9
 +                    val payload = inner["payload"] ?: return
 +                    when (event) {
 +                        "together_state" -> runCatching {
-+                            onRoomState?.invoke(json.decodeFromJsonElement<TogetherRoomState>(payload))
++                            onRoomState?.invoke(json.decodeFromJsonElement(TogetherRoomState.serializer(), payload))
 +                        }
 +                        "together_hello" -> runCatching {
-+                            onMemberHello?.invoke(json.decodeFromJsonElement<TogetherMember>(payload))
++                            onMemberHello?.invoke(json.decodeFromJsonElement(TogetherMember.serializer(), payload))
 +                        }
 +                        "together_bye" -> runCatching {
-+                            onMemberBye?.invoke(json.decodeFromJsonElement<TogetherMember>(payload))
++                            onMemberBye?.invoke(json.decodeFromJsonElement(TogetherMember.serializer(), payload))
 +                        }
 +                        "together_request" -> runCatching {
-+                            onStateRequested?.invoke(json.decodeFromJsonElement<TogetherMember>(payload))
++                            onStateRequested?.invoke(json.decodeFromJsonElement(TogetherMember.serializer(), payload))
 +                        }
 +                    }
 +                }
