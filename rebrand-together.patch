@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 655dc41..1b43c9b 100644
+index 655dc41..caceecf 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -60,14 +60,21 @@ android {
@@ -8,8 +8,8 @@ index 655dc41..1b43c9b 100644
          targetSdk = 35
 -        versionCode = 27
 -        versionName = "4.2.7"
-+        versionCode = 29
-+        versionName = "4.2.9"
++        versionCode = 30
++        versionName = "4.2.10"
  
          val lastWaveLyricsToken = resolveSecret("LASTWAVE_LYRICS_TOKEN")
          val lastWaveLyricsUrl = resolveSecret("LASTWAVE_LYRICS_URL")
@@ -510,7 +510,7 @@ index 0000000..bd6d052
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
 new file mode 100644
-index 0000000..e1a77f7
+index 0000000..fe58180
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
 @@ -0,0 +1,326 @@
@@ -645,7 +645,7 @@ index 0000000..e1a77f7
 +        shouldStayConnected = true
 +        onConnection?.invoke(TogetherConnection.Connecting)
 +        val request = Request.Builder()
-+            .url("wss://$host/realtime/v1/websocket?apikey=$lastKey&vsn=2.0.0")
++            .url("wss://$host/realtime/v1/websocket?apikey=$lastKey&vsn=1.0.0")
 +            .build()
 +        socket = client.newWebSocket(request, listener)
 +    }
