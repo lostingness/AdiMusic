@@ -1201,7 +1201,7 @@ index 0000000..f0a3a0e
 +    }
 +}
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index ef8ddcb..8d37e14 100644
+index ef8ddcb..b519608 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -328,4 +328,39 @@
@@ -1210,7 +1210,7 @@ index ef8ddcb..8d37e14 100644
      <string name="settings_search_title">Search settings</string>
 +    <string name="nav_together">Together</string>
 +    <string name="together_subtitle">Listen together, in perfect sync</string>
-+    <string name="together_not_configured_title">Together isn't set up yet</string>
++    <string name="together_not_configured_title">Together isn\'t set up yet</string>
 +    <string name="together_not_configured_text">This build has no realtime server configured. Add SUPABASE_URL and SUPABASE_ANON_KEY (see SUPABASE_SETUP.md), then reinstall to create and join rooms.</string>
 +    <string name="together_status_label">Connection</string>
 +    <string name="together_status_connected">Connected</string>
