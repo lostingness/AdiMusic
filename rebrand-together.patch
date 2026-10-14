@@ -1,0 +1,1246 @@
+diff --git a/app/build.gradle.kts b/app/build.gradle.kts
+index 655dc41..6c2fdb3 100644
+--- a/app/build.gradle.kts
++++ b/app/build.gradle.kts
+@@ -60,14 +60,21 @@ android {
+         applicationId = "com.lastwave.app"
+         minSdk = (project.findProperty("minSdk") as? String)?.toIntOrNull() ?: 29
+         targetSdk = 35
+-        versionCode = 27
+-        versionName = "4.2.7"
++        versionCode = 28
++        versionName = "4.2.8"
+ 
+         val lastWaveLyricsToken = resolveSecret("LASTWAVE_LYRICS_TOKEN")
+         val lastWaveLyricsUrl = resolveSecret("LASTWAVE_LYRICS_URL")
+         buildConfigField("String", "LASTWAVE_LYRICS_TOKEN", "\"$lastWaveLyricsToken\"")
+         buildConfigField("String", "LASTWAVE_LYRICS_URL", "\"$lastWaveLyricsUrl\"")
+ 
++        // Together (Listen Together) realtime backend — Supabase Realtime.
++        // Empty in builds without secrets: the Together tab shows setup steps.
++        val supabaseUrl = resolveSecret("SUPABASE_URL")
++        val supabaseAnonKey = resolveSecret("SUPABASE_ANON_KEY")
++        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
++        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseAnonKey\"")
++
+         // Native secrets (addon client lock) live strictly in native .so via
+         // SecretsBridge_generated.h (tools/generate_native_secrets.py).
+         // No secret fields are exposed in DEX / BuildConfig.
+diff --git a/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt b/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
+index 33b6163..9a36be9 100644
+--- a/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
++++ b/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
+@@ -48,6 +48,7 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
+ import androidx.compose.material.icons.filled.AutoAwesome
+ import androidx.compose.material.icons.filled.Close
+ import androidx.compose.material.icons.filled.CloudDownload
++import androidx.compose.material.icons.filled.Group
+ import androidx.compose.material.icons.filled.Home
+ import androidx.compose.material.icons.filled.Leaderboard
+ import androidx.compose.material3.Icon
+@@ -159,6 +160,7 @@ private enum class MainTab(val labelRes: Int) {
+     FEED(com.lastwave.app.R.string.nav_feed),
+     STATS(com.lastwave.app.R.string.nav_stats),
+     PLAYLISTS(com.lastwave.app.R.string.nav_playlists),
++    TOGETHER(com.lastwave.app.R.string.nav_together),
+ }
+ 
+ /** Shared with any screen hosted inside [MainShell] so their scrolling
+@@ -267,6 +269,7 @@ fun MainShell(
+                         onOpenPlaylist = onOpenPlaylist,
+                         onOpenSpotifyImport = onOpenSpotifyImport,
+                     )
++                    MainTab.TOGETHER -> com.lastwave.app.ui.together.TogetherScreen()
+                 }
+             }
+         }
+@@ -623,4 +626,5 @@ private fun MainTab.icon(): ImageVector = when (this) {
+     MainTab.FEED -> Icons.Filled.Home
+     MainTab.STATS -> Icons.Filled.Leaderboard
+     MainTab.PLAYLISTS -> Icons.AutoMirrored.Filled.QueueMusic
++    MainTab.TOGETHER -> Icons.Filled.Group
+ }
+diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
+new file mode 100644
+index 0000000..f49508a
+--- /dev/null
++++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
+@@ -0,0 +1,440 @@
++package com.lastwave.app.ui.together
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.filled.ContentCopy
++import androidx.compose.material.icons.filled.Group
++import androidx.compose.material.icons.filled.MusicNote
++import androidx.compose.material3.Button
++import androidx.compose.material3.Card
++import androidx.compose.material3.CardDefaults
++import androidx.compose.material3.Icon
++import androidx.compose.material3.MaterialTheme
++import androidx.compose.material3.OutlinedButton
++import androidx.compose.material3.OutlinedTextField
++import androidx.compose.material3.Surface
++import androidx.compose.material3.Switch
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.platform.LocalClipboardManager
++import androidx.compose.ui.res.stringResource
++import androidx.compose.ui.text.AnnotatedString
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.unit.dp
++import androidx.hilt.navigation.compose.hiltViewModel
++import androidx.lifecycle.compose.collectAsStateWithLifecycle
++import com.lastwave.app.R
++import com.lastwave.app.ui.common.ArtworkImage
++import com.lastwave.app.ui.common.ExpressiveHeader
++import com.lastwave.app.ui.common.adaptiveContentWidth
++import com.lastwave.app.ui.common.safeDrawingBottomPadding
++import com.lastwave.app.ui.shell.FloatingNavDefaults
++import kotlinx.coroutines.delay
++
++private fun formatPosition(ms: Long): String {
++    val totalSeconds = (ms / 1000).coerceAtLeast(0)
++    return "${totalSeconds / 60}:${(totalSeconds % 60).toString().padStart(2, '0')}"
++}
++
++/**
++ * The Together tab: create or join a listening room, see who is in it,
++ * and watch the room's playback stay in sync. The host's player drives the
++ * room; joiners follow automatically. Nothing here re-implements playback —
++ * it all goes through the shared [MusicPlayer].
++ */
++@Composable
++fun TogetherScreen(
++    viewModel: TogetherViewModel = hiltViewModel(),
++) {
++    val state by viewModel.uiState.collectAsStateWithLifecycle()
++    val clipboard = LocalClipboardManager.current
++
++    if (state.copied) {
++        LaunchedEffect(Unit) {
++            delay(1_600)
++            viewModel.onCopiedConsumed()
++        }
++    }
++
++    Box(
++        modifier = Modifier.fillMaxSize(),
++        contentAlignment = Alignment.TopCenter,
++    ) {
++        Column(
++            Modifier
++                .fillMaxSize()
++                .adaptiveContentWidth(maxWidth = 760.dp)
++                .verticalScroll(rememberScrollState())
++                .safeDrawingBottomPadding()
++                .padding(bottom = FloatingNavDefaults.ContentBottomPadding),
++        ) {
++            ExpressiveHeader(
++                title = stringResource(R.string.nav_together),
++                subtitle = stringResource(R.string.together_subtitle),
++            )
++
++            Column(
++                modifier = Modifier.padding(horizontal = 16.dp),
++                verticalArrangement = Arrangement.spacedBy(16.dp),
++            ) {
++                if (!state.configured) {
++                    Card(
++                        colors = CardDefaults.cardColors(
++                            containerColor = MaterialTheme.colorScheme.errorContainer
++                        ),
++                        modifier = Modifier.fillMaxWidth(),
++                    ) {
++                        Column(Modifier.padding(16.dp)) {
++                            Text(
++                                text = stringResource(R.string.together_not_configured_title),
++                                style = MaterialTheme.typography.titleMedium,
++                                fontWeight = FontWeight.Bold,
++                            )
++                            Spacer(Modifier.height(6.dp))
++                            Text(
++                                text = stringResource(R.string.together_not_configured_text),
++                                style = MaterialTheme.typography.bodyMedium,
++                            )
++                        }
++                    }
++                }
++
++                // ---- connection status ----
++                Card(modifier = Modifier.fillMaxWidth()) {
++                    Column(Modifier.padding(16.dp)) {
++                        Row(verticalAlignment = Alignment.CenterVertically) {
++                            val (dotColor, statusText) = when (val c = state.connection) {
++                                is TogetherConnection.Connected ->
++                                    MaterialTheme.colorScheme.primary to stringResource(R.string.together_status_connected)
++                                is TogetherConnection.Connecting ->
++                                    MaterialTheme.colorScheme.tertiary to stringResource(R.string.together_status_connecting)
++                                is TogetherConnection.Failed ->
++                                    MaterialTheme.colorScheme.error to stringResource(R.string.together_status_failed)
++                                is TogetherConnection.Disconnected ->
++                                    MaterialTheme.colorScheme.outline to stringResource(R.string.together_status_disconnected)
++                            }
++                            Box(
++                                Modifier
++                                    .size(10.dp)
++                                    .clip(CircleShape)
++                                    .background(dotColor)
++                            )
++                            Spacer(Modifier.width(8.dp))
++                            Text(
++                                text = "${stringResource(R.string.together_status_label)}: $statusText",
++                                style = MaterialTheme.typography.titleSmall,
++                                fontWeight = FontWeight.SemiBold,
++                            )
++                        }
++                        if (state.inRoom) {
++                            Spacer(Modifier.height(12.dp))
++                            Row(
++                                verticalAlignment = Alignment.CenterVertically,
++                                horizontalArrangement = Arrangement.SpaceBetween,
++                                modifier = Modifier.fillMaxWidth(),
++                            ) {
++                                Text(
++                                    text = state.roomCode,
++                                    style = MaterialTheme.typography.headlineMedium,
++                                    fontWeight = FontWeight.ExtraBold,
++                                    letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified,
++                                )
++                                OutlinedButton(onClick = {
++                                    clipboard.setText(AnnotatedString(state.roomCode))
++                                    viewModel.onCopied()
++                                }) {
++                                    Icon(Icons.Filled.ContentCopy, contentDescription = null)
++                                    Spacer(Modifier.width(6.dp))
++                                    Text(stringResource(R.string.together_copy_code))
++                                }
++                            }
++                            if (state.copied) {
++                                Text(
++                                    text = stringResource(R.string.together_copied),
++                                    style = MaterialTheme.typography.bodySmall,
++                                    color = MaterialTheme.colorScheme.primary,
++                                )
++                            }
++                            Spacer(Modifier.height(8.dp))
++                            Text(
++                                text = if (state.isHost) {
++                                    stringResource(R.string.together_you_are_host)
++                                } else {
++                                    stringResource(R.string.together_following)
++                                },
++                                style = MaterialTheme.typography.bodyMedium,
++                                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                            )
++                            if (state.hostLeft) {
++                                Spacer(Modifier.height(6.dp))
++                                Text(
++                                    text = stringResource(R.string.together_host_left),
++                                    style = MaterialTheme.typography.bodyMedium,
++                                    color = MaterialTheme.colorScheme.error,
++                                )
++                            }
++                            if (state.members.isNotEmpty()) {
++                                Spacer(Modifier.height(12.dp))
++                                Text(
++                                    text = stringResource(R.string.together_members),
++                                    style = MaterialTheme.typography.titleSmall,
++                                    fontWeight = FontWeight.SemiBold,
++                                )
++                                Spacer(Modifier.height(6.dp))
++                                Row(
++                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
++                                    modifier = Modifier.fillMaxWidth(),
++                                ) {
++                                    state.members.forEach { member ->
++                                        Surface(
++                                            shape = RoundedCornerShape(999.dp),
++                                            color = if (member.isHost) {
++                                                MaterialTheme.colorScheme.primaryContainer
++                                            } else {
++                                                MaterialTheme.colorScheme.surfaceContainerHigh
++                                            },
++                                        ) {
++                                            Row(
++                                                verticalAlignment = Alignment.CenterVertically,
++                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
++                                            ) {
++                                                Icon(
++                                                    Icons.Filled.Group,
++                                                    contentDescription = null,
++                                                    modifier = Modifier.size(14.dp),
++                                                )
++                                                Spacer(Modifier.width(4.dp))
++                                                Text(
++                                                    text = member.name,
++                                                    style = MaterialTheme.typography.bodySmall,
++                                                    fontWeight = FontWeight.SemiBold,
++                                                )
++                                            }
++                                        }
++                                    }
++                                }
++                            }
++                            Spacer(Modifier.height(14.dp))
++                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
++                                OutlinedButton(
++                                    onClick = { viewModel.reconnect() },
++                                    modifier = Modifier.weight(1f),
++                                ) {
++                                    Text(stringResource(R.string.together_reconnect))
++                                }
++                                Button(
++                                    onClick = { viewModel.leaveRoom() },
++                                    modifier = Modifier.weight(1f),
++                                ) {
++                                    Text(stringResource(R.string.together_leave_room))
++                                }
++                            }
++                        }
++                    }
++                }
++
++                // ---- now playing in the room ----
++                if (state.inRoom) {
++                    Card(modifier = Modifier.fillMaxWidth()) {
++                        Column(Modifier.padding(16.dp)) {
++                            Text(
++                                text = stringResource(R.string.together_now_playing),
++                                style = MaterialTheme.typography.titleSmall,
++                                fontWeight = FontWeight.SemiBold,
++                            )
++                            Spacer(Modifier.height(10.dp))
++                            val track = state.roomTrack
++                            if (track?.trackVideoId == null) {
++                                Text(
++                                    text = stringResource(R.string.together_no_track),
++                                    style = MaterialTheme.typography.bodyMedium,
++                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                )
++                            } else {
++                                Row(verticalAlignment = Alignment.CenterVertically) {
++                                    ArtworkImage(
++                                        name = track.title ?: "",
++                                        artist = track.artist ?: "",
++                                        embeddedUrl = track.artworkUrl,
++                                        fallbackIcon = Icons.Filled.MusicNote,
++                                        modifier = Modifier
++                                            .size(56.dp)
++                                            .clip(RoundedCornerShape(12.dp)),
++                                    )
++                                    Spacer(Modifier.width(12.dp))
++                                    Column(Modifier.weight(1f)) {
++                                        Text(
++                                            text = track.title ?: "",
++                                            style = MaterialTheme.typography.titleMedium,
++                                            fontWeight = FontWeight.Bold,
++                                            maxLines = 1,
++                                        )
++                                        Text(
++                                            text = track.artist ?: "",
++                                            style = MaterialTheme.typography.bodyMedium,
++                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                            maxLines = 1,
++                                        )
++                                        if (track.durationMs > 0) {
++                                            Text(
++                                                text = "${formatPosition(track.positionMs)} / ${formatPosition(track.durationMs)}",
++                                                style = MaterialTheme.typography.bodySmall,
++                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                            )
++                                        }
++                                    }
++                                }
++                            }
++                        }
++                    }
++                }
++
++                // ---- create / join ----
++                if (!state.inRoom) {
++                    Card(modifier = Modifier.fillMaxWidth()) {
++                        Column(
++                            Modifier.padding(16.dp),
++                            verticalArrangement = Arrangement.spacedBy(12.dp),
++                        ) {
++                            OutlinedTextField(
++                                value = state.username,
++                                onValueChange = viewModel::onUsernameChange,
++                                label = { Text(stringResource(R.string.together_username_label)) },
++                                placeholder = { Text(stringResource(R.string.together_username_hint)) },
++                                singleLine = true,
++                                modifier = Modifier.fillMaxWidth(),
++                            )
++                            OutlinedTextField(
++                                value = state.roomCodeInput,
++                                onValueChange = viewModel::onRoomCodeInputChange,
++                                label = { Text(stringResource(R.string.together_room_code_label)) },
++                                placeholder = { Text(stringResource(R.string.together_room_code_hint)) },
++                                singleLine = true,
++                                modifier = Modifier.fillMaxWidth(),
++                            )
++                            state.error?.let {
++                                Text(
++                                    text = it,
++                                    style = MaterialTheme.typography.bodyMedium,
++                                    color = MaterialTheme.colorScheme.error,
++                                )
++                            }
++                            Button(
++                                onClick = { viewModel.createRoom() },
++                                enabled = state.configured,
++                                modifier = Modifier.fillMaxWidth(),
++                            ) {
++                                Text(stringResource(R.string.together_create_room))
++                            }
++                            OutlinedButton(
++                                onClick = { viewModel.joinRoom() },
++                                enabled = state.configured,
++                                modifier = Modifier.fillMaxWidth(),
++                            ) {
++                                Text(stringResource(R.string.together_join_room))
++                            }
++                        }
++                    }
++
++                    Card(modifier = Modifier.fillMaxWidth()) {
++                        Column(Modifier.padding(16.dp)) {
++                            Text(
++                                text = stringResource(R.string.together_how_title),
++                                style = MaterialTheme.typography.titleMedium,
++                                fontWeight = FontWeight.Bold,
++                            )
++                            Spacer(Modifier.height(8.dp))
++                            Text(
++                                text = stringResource(R.string.together_how_1),
++                                style = MaterialTheme.typography.bodyMedium,
++                            )
++                            Spacer(Modifier.height(4.dp))
++                            Text(
++                                text = stringResource(R.string.together_how_2),
++                                style = MaterialTheme.typography.bodyMedium,
++                            )
++                            Spacer(Modifier.height(4.dp))
++                            Text(
++                                text = stringResource(R.string.together_how_3),
++                                style = MaterialTheme.typography.bodyMedium,
++                            )
++                        }
++                    }
++                }
++
++                // ---- settings ----
++                Card(modifier = Modifier.fillMaxWidth()) {
++                    Column(
++                        Modifier.padding(16.dp),
++                        verticalArrangement = Arrangement.spacedBy(12.dp),
++                    ) {
++                        Text(
++                            text = stringResource(R.string.together_settings_title),
++                            style = MaterialTheme.typography.titleMedium,
++                            fontWeight = FontWeight.Bold,
++                        )
++                        OutlinedTextField(
++                            value = state.username,
++                            onValueChange = viewModel::onUsernameChange,
++                            label = { Text(stringResource(R.string.together_username_label)) },
++                            singleLine = true,
++                            modifier = Modifier.fillMaxWidth(),
++                        )
++                        Row(
++                            verticalAlignment = Alignment.CenterVertically,
++                            horizontalArrangement = Arrangement.SpaceBetween,
++                            modifier = Modifier.fillMaxWidth(),
++                        ) {
++                            Column(Modifier.weight(1f)) {
++                                Text(
++                                    text = stringResource(R.string.together_autosync_title),
++                                    style = MaterialTheme.typography.titleSmall,
++                                    fontWeight = FontWeight.SemiBold,
++                                )
++                                Text(
++                                    text = stringResource(R.string.together_autosync_desc),
++                                    style = MaterialTheme.typography.bodySmall,
++                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                )
++                            }
++                            Switch(
++                                checked = state.autoSync,
++                                onCheckedChange = viewModel::onAutoSyncChange,
++                            )
++                        }
++                    }
++                }
++
++                Text(
++                    text = stringResource(R.string.together_subtitle),
++                    style = MaterialTheme.typography.bodySmall,
++                    color = MaterialTheme.colorScheme.onSurfaceVariant,
++                    textAlign = TextAlign.Center,
++                    modifier = Modifier.fillMaxWidth(),
++                )
++                Spacer(Modifier.height(8.dp))
++            }
++        }
++    }
++}
+diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
+new file mode 100644
+index 0000000..f235fd9
+--- /dev/null
++++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
+@@ -0,0 +1,313 @@
++package com.lastwave.app.ui.together
++
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.launch
++import kotlinx.serialization.Serializable
++import kotlinx.serialization.encodeToString
++import kotlinx.serialization.json.Json
++import kotlinx.serialization.json.JsonElement
++import kotlinx.serialization.json.JsonNull
++import kotlinx.serialization.json.JsonObject
++import kotlinx.serialization.json.JsonPrimitive
++import kotlinx.serialization.json.jsonObject
++import kotlinx.serialization.json.jsonPrimitive
++import okhttp3.OkHttpClient
++import okhttp3.Request
++import okhttp3.Response
++import okhttp3.WebSocket
++import okhttp3.WebSocketListener
++import java.util.concurrent.atomic.AtomicInteger
++
++/**
++ * One playback snapshot shared across a Together room.
++ * [updatedAtMs] is the sender's wall clock; receivers add the elapsed time
++ * while the track is playing to compute the expected position (drift correction).
++ */
++@Serializable
++data class TogetherRoomState(
++    val v: Int = 1,
++    val trackVideoId: String? = null,
++    val title: String? = null,
++    val artist: String? = null,
++    val artworkUrl: String? = null,
++    val durationMs: Long = 0L,
++    val positionMs: Long = 0L,
++    val playing: Boolean = false,
++    val updatedAtMs: Long = 0L,
++    val senderId: String = "",
++    val senderName: String = "",
++    val isHost: Boolean = false,
++)
++
++@Serializable
++data class TogetherMember(
++    val id: String = "",
++    val name: String = "",
++    val isHost: Boolean = false,
++)
++
++sealed interface TogetherConnection {
++    data object Disconnected : TogetherConnection
++    data object Connecting : TogetherConnection
++    data object Connected : TogetherConnection
++    data class Failed(val message: String) : TogetherConnection
++}
++
++@Serializable
++private data class PhoenixMessage(
++    val topic: String,
++    val event: String,
++    val payload: JsonElement = JsonNull,
++    val ref: String? = null,
++)
++
++@Serializable
++private data class PhoenixJoinConfig(val broadcast: PhoenixBroadcastConfig)
++
++@Serializable
++private data class PhoenixBroadcastConfig(val self: Boolean)
++
++@Serializable
++private data class PhoenixJoinPayload(val config: PhoenixJoinConfig)
++
++@Serializable
++private data class PhoenixBroadcastOut(val event: String, val payload: JsonElement)
++
++/**
++ * Minimal Supabase Realtime client speaking the Phoenix-channels protocol
++ * over an OkHttp WebSocket. No new dependencies: the app already ships
++ * OkHttp + kotlinx-serialization.
++ *
++ * Channel: `realtime:together:<CODE>` — broadcast only, no tables needed.
++ * The room code itself is the access control: codes are 6 chars from a
++ * 31-symbol alphabet generated with SecureRandom (~887M combinations).
++ */
++class TogetherSyncEngine {
++
++    var onConnection: ((TogetherConnection) -> Unit)? = null
++    var onRoomState: ((TogetherRoomState) -> Unit)? = null
++    var onMemberHello: ((TogetherMember) -> Unit)? = null
++    var onMemberBye: ((TogetherMember) -> Unit)? = null
++    var onStateRequested: ((TogetherMember) -> Unit)? = null
++
++    private val json = Json { ignoreUnknownKeys = true }
++    private val client = OkHttpClient()
++    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
++    private val refCounter = AtomicInteger(0)
++
++    @Volatile private var socket: WebSocket? = null
++    @Volatile private var topic: String = ""
++    @Volatile private var shouldStayConnected = false
++    @Volatile private var reconnectAttempts = 0
++    @Volatile private var lastUrl: String = ""
++    @Volatile private var lastKey: String = ""
++    @Volatile private var lastRoomCode: String = ""
++    private var heartbeatJob: Job? = null
++    private var reconnectJob: Job? = null
++
++    fun connect(supabaseUrl: String, anonKey: String, roomCode: String) {
++        lastUrl = supabaseUrl
++        lastKey = anonKey
++        lastRoomCode = roomCode
++        reconnectAttempts = 0
++        dial()
++    }
++
++    private fun dial() {
++        disconnectSocketOnly()
++        val host = lastUrl
++            .removePrefix("https://")
++            .removePrefix("http://")
++            .trimEnd('/')
++        topic = "realtime:together:${lastRoomCode.uppercase()}"
++        shouldStayConnected = true
++        onConnection?.invoke(TogetherConnection.Connecting)
++        val request = Request.Builder()
++            .url("wss://$host/realtime/v1/websocket?apikey=$lastKey&vsn=2.0.0")
++            .build()
++        socket = client.newWebSocket(request, listener)
++    }
++
++    fun disconnect() {
++        shouldStayConnected = false
++        reconnectJob?.cancel()
++        heartbeatJob?.cancel()
++        disconnectSocketOnly()
++        onConnection?.invoke(TogetherConnection.Disconnected)
++    }
++
++    /** Manual reconnect: dial again with the stored room params. */
++    fun reconnect() {
++        if (lastUrl.isBlank() || lastRoomCode.isBlank()) return
++        reconnectAttempts = 0
++        reconnectJob?.cancel()
++        dial()
++    }
++
++    fun sendState(state: TogetherRoomState) {
++        sendBroadcast("together_state", json.encodeToString(state))
++    }
++
++    fun sendHello(member: TogetherMember) {
++        sendBroadcast("together_hello", json.encodeToString(member))
++    }
++
++    fun sendBye(member: TogetherMember) {
++        sendBroadcast("together_bye", json.encodeToString(member))
++    }
++
++    fun sendStateRequest(member: TogetherMember) {
++        sendBroadcast("together_request", json.encodeToString(member))
++    }
++
++    private fun sendBroadcast(event: String, payloadJson: String) {
++        val ws = socket ?: return
++        if (topic.isBlank()) return
++        val payload = json.parseToJsonElement(payloadJson)
++        val msg = PhoenixMessage(
++            topic = topic,
++            event = "broadcast",
++            payload = JsonObject(
++                mapOf(
++                    "event" to JsonPrimitive(event),
++                    "payload" to payload,
++                )
++            ),
++            ref = nextRef(),
++        )
++        ws.send(json.encodeToString(msg))
++    }
++
++    private fun nextRef(): String = refCounter.incrementAndGet().toString()
++
++    private fun disconnectSocketOnly() {
++        heartbeatJob?.cancel()
++        try { socket?.close(1000, "leave") } catch (_: Exception) { }
++        socket = null
++    }
++
++    private fun startHeartbeat() {
++        heartbeatJob?.cancel()
++        heartbeatJob = scope.launch {
++            while (true) {
++                delay(25_000)
++                val ws = socket ?: break
++                val msg = PhoenixMessage(
++                    topic = "phoenix",
++                    event = "heartbeat",
++                    payload = JsonObject(emptyMap()),
++                    ref = nextRef(),
++                )
++                ws.send(json.encodeToString(msg))
++            }
++        }
++    }
++
++    private fun scheduleReconnect() {
++        if (!shouldStayConnected) return
++        if (reconnectAttempts >= 5) {
++            onConnection?.invoke(TogetherConnection.Failed("Connection lost"))
++            return
++        }
++        val attempt = reconnectAttempts++
++        val delayMs = minOf(2_000L shl attempt, 30_000L)
++        reconnectJob?.cancel()
++        reconnectJob = scope.launch {
++            delay(delayMs)
++            if (shouldStayConnected) dial()
++        }
++    }
++
++    private val listener = object : WebSocketListener() {
++        override fun onOpen(webSocket: WebSocket, response: Response) {
++            val join = PhoenixMessage(
++                topic = topic,
++                event = "phx_join",
++                payload = JsonObject(
++                    mapOf(
++                        "config" to JsonObject(
++                            mapOf(
++                                "broadcast" to JsonObject(
++                                    mapOf("self" to JsonPrimitive(false))
++                                )
++                            )
++                        )
++                    )
++                ),
++                ref = nextRef(),
++            )
++            webSocket.send(json.encodeToString(join))
++            startHeartbeat()
++        }
++
++        override fun onMessage(webSocket: WebSocket, text: String) {
++            val parsed = runCatching { json.decodeFromString<PhoenixMessage>(text) }.getOrNull() ?: return
++            when (parsed.event) {
++                "phx_reply" -> {
++                    val status = (parsed.payload as? JsonObject)
++                        ?.get("status")?.jsonPrimitive?.content
++                    if (status == "ok") {
++                        reconnectAttempts = 0
++                        onConnection?.invoke(TogetherConnection.Connected)
++                    } else {
++                        onConnection?.invoke(
++                            TogetherConnection.Failed("Could not join room")
++                        )
++                    }
++                }
++                "broadcast" -> {
++                    val inner = parsed.payload as? JsonObject ?: return
++                    val event = inner["event"]?.jsonPrimitive?.content ?: return
++                    val payload = inner["payload"] ?: return
++                    when (event) {
++                        "together_state" -> runCatching {
++                            onRoomState?.invoke(json.decodeFromJsonElement<TogetherRoomState>(payload))
++                        }
++                        "together_hello" -> runCatching {
++                            onMemberHello?.invoke(json.decodeFromJsonElement<TogetherMember>(payload))
++                        }
++                        "together_bye" -> runCatching {
++                            onMemberBye?.invoke(json.decodeFromJsonElement<TogetherMember>(payload))
++                        }
++                        "together_request" -> runCatching {
++                            onStateRequested?.invoke(json.decodeFromJsonElement<TogetherMember>(payload))
++                        }
++                    }
++                }
++                "phx_close", "phx_error" -> {
++                    onConnection?.invoke(TogetherConnection.Disconnected)
++                    scheduleReconnect()
++                }
++            }
++        }
++
++        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
++            heartbeatJob?.cancel()
++            if (shouldStayConnected) {
++                onConnection?.invoke(TogetherConnection.Disconnected)
++                scheduleReconnect()
++            }
++        }
++
++        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
++            heartbeatJob?.cancel()
++            if (shouldStayConnected) {
++                onConnection?.invoke(TogetherConnection.Disconnected)
++                scheduleReconnect()
++            }
++        }
++    }
++
++    fun release() {
++        shouldStayConnected = false
++        reconnectJob?.cancel()
++        heartbeatJob?.cancel()
++        disconnectSocketOnly()
++        scope.cancel()
++    }
++}
+diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
+new file mode 100644
+index 0000000..f0a3a0e
+--- /dev/null
++++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
+@@ -0,0 +1,369 @@
++package com.lastwave.app.ui.together
++
++import android.content.Context
++import androidx.lifecycle.ViewModel
++import androidx.lifecycle.viewModelScope
++import com.lastwave.app.BuildConfig
++import com.lastwave.app.playback.MusicPlayer
++import com.lastwave.app.playback.PlayableTrack
++import dagger.hilt.android.lifecycle.HiltViewModel
++import dagger.hilt.android.qualifiers.ApplicationContext
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asStateFlow
++import kotlinx.coroutines.flow.update
++import kotlinx.coroutines.launch
++import java.security.SecureRandom
++import java.util.UUID
++import javax.inject.Inject
++
++data class TogetherUiState(
++    val configured: Boolean = false,
++    val username: String = "",
++    val roomCodeInput: String = "",
++    val inRoom: Boolean = false,
++    val roomCode: String = "",
++    val isHost: Boolean = false,
++    val connection: TogetherConnection = TogetherConnection.Disconnected,
++    val members: List<TogetherMember> = emptyList(),
++    val roomTrack: TogetherRoomState? = null,
++    val hostLeft: Boolean = false,
++    val autoSync: Boolean = true,
++    val error: String? = null,
++    val copied: Boolean = false,
++)
++
++private const val PREFS = "together_prefs"
++private const val KEY_USERNAME = "username"
++private const val KEY_AUTO_SYNC = "auto_sync"
++private const val KEY_SELF_ID = "self_id"
++
++/** Drift above this is corrected with a seek (keeps both players aligned). */
++private const val DRIFT_TOLERANCE_MS = 600L
++
++/**
++ * Owns the Together room: creating/joining, broadcasting the host's playback,
++ * applying the host's state as a joiner, drift correction and reconnects.
++ *
++ * Only the host broadcasts. Joiners apply host state and never echo it back,
++ * so there is no feedback loop. The shared [MusicPlayer] is reused — joining
++ * a room replaces local playback with the room's track, exactly like tapping
++ * any other track in the app.
++ */
++@HiltViewModel
++class TogetherViewModel @Inject constructor(
++    private val musicPlayer: MusicPlayer,
++    @ApplicationContext private val context: Context,
++) : ViewModel() {
++
++    private val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++    private val engine = TogetherSyncEngine()
++
++    private val selfId: String = prefs.getString(KEY_SELF_ID, null) ?: UUID.randomUUID().toString().also {
++        prefs.edit().putString(KEY_SELF_ID, it).apply()
++    }
++
++    private val _uiState = MutableStateFlow(
++        TogetherUiState(
++            configured = BuildConfig.SUPABASE_URL.isNotBlank() && BuildConfig.SUPABASE_ANON_KEY.isNotBlank(),
++            username = prefs.getString(KEY_USERNAME, "") ?: "",
++            autoSync = prefs.getBoolean(KEY_AUTO_SYNC, true),
++        )
++    )
++    val uiState: StateFlow<TogetherUiState> = _uiState.asStateFlow()
++
++    private var pendingSeekMs: Long? = null
++    private var pendingVideoId: String? = null
++    private var pendingSeekSetAtMs: Long = 0L
++    private var lastHostPositionMs: Long = 0L
++    private var lastHostEmittedAtMs: Long = 0L
++    private var lastBroadcastVideoId: String? = null
++    private var lastBroadcastPlaying: Boolean? = null
++    private var heartbeatStarted = false
++
++    init {
++        engine.onConnection = { connection ->
++            _uiState.update { it.copy(connection = connection) }
++            if (connection is TogetherConnection.Connected) {
++                val state = _uiState.value
++                engine.sendHello(TogetherMember(selfId, state.username, state.isHost))
++                if (!state.isHost) {
++                    engine.sendStateRequest(TogetherMember(selfId, state.username, false))
++                }
++            }
++        }
++        engine.onRoomState = { roomState -> onRoomStateReceived(roomState) }
++        engine.onMemberHello = { member ->
++            _uiState.update { state ->
++                val without = state.members.filterNot { it.id == member.id }
++                state.copy(members = (without + member).sortedBy { !it.isHost })
++            }
++        }
++        engine.onMemberBye = { member ->
++            _uiState.update { state ->
++                state.copy(
++                    members = state.members.filterNot { it.id == member.id },
++                    hostLeft = if (member.isHost) true else state.hostLeft,
++                    connection = if (member.isHost && !state.isHost) {
++                        TogetherConnection.Disconnected
++                    } else {
++                        state.connection
++                    },
++                )
++            }
++        }
++        engine.onStateRequested = { _ ->
++            if (_uiState.value.isHost) broadcastCurrentState()
++        }
++        observePlayer()
++        startHeartbeat()
++    }
++
++    fun onUsernameChange(value: String) {
++        _uiState.update { it.copy(username = value, error = null) }
++    }
++
++    fun onRoomCodeInputChange(value: String) {
++        _uiState.update {
++            it.copy(
++                roomCodeInput = value.uppercase().filter { ch -> ch.isLetterOrDigit() }.take(6),
++                error = null,
++            )
++        }
++    }
++
++    fun onAutoSyncChange(enabled: Boolean) {
++        prefs.edit().putBoolean(KEY_AUTO_SYNC, enabled).apply()
++        _uiState.update { it.copy(autoSync = enabled) }
++    }
++
++    fun createRoom() {
++        val username = _uiState.value.username.trim()
++        if (!validUsername(username)) {
++            _uiState.update { it.copy(error = "Please enter a name (2–20 characters).") }
++            return
++        }
++        if (!_uiState.value.configured) {
++            _uiState.update { it.copy(error = "Together is not set up yet on this build.") }
++            return
++        }
++        saveUsername(username)
++        val code = generateRoomCode()
++        joinEngine(code, isHost = true)
++        _uiState.update {
++            it.copy(
++                inRoom = true,
++                roomCode = code,
++                isHost = true,
++                members = listOf(TogetherMember(selfId, username, true)),
++                hostLeft = false,
++                error = null,
++            )
++        }
++        broadcastCurrentState()
++    }
++
++    fun joinRoom() {
++        val username = _uiState.value.username.trim()
++        if (!validUsername(username)) {
++            _uiState.update { it.copy(error = "Please enter a name (2–20 characters).") }
++            return
++        }
++        if (!_uiState.value.configured) {
++            _uiState.update { it.copy(error = "Together is not set up yet on this build.") }
++            return
++        }
++        val code = _uiState.value.roomCodeInput.trim().uppercase()
++        if (code.length != 6 || !code.all { it.isLetterOrDigit() }) {
++            _uiState.update { it.copy(error = "Enter the 6-character room code.") }
++            return
++        }
++        saveUsername(username)
++        joinEngine(code, isHost = false)
++        _uiState.update {
++            it.copy(
++                inRoom = true,
++                roomCode = code,
++                isHost = false,
++                members = listOf(TogetherMember(selfId, username, false)),
++                hostLeft = false,
++                error = null,
++            )
++        }
++    }
++
++    fun leaveRoom() {
++        val state = _uiState.value
++        if (state.inRoom) {
++            engine.sendBye(TogetherMember(selfId, state.username, state.isHost))
++        }
++        engine.disconnect()
++        _uiState.update {
++            it.copy(
++                inRoom = false,
++                roomCode = "",
++                isHost = false,
++                members = emptyList(),
++                roomTrack = null,
++                hostLeft = false,
++                error = null,
++            )
++        }
++    }
++
++    fun reconnect() {
++        engine.reconnect()
++    }
++
++    fun onCopied() {
++        _uiState.update { it.copy(copied = true) }
++    }
++
++    fun onCopiedConsumed() {
++        _uiState.update { it.copy(copied = false) }
++    }
++
++    private fun joinEngine(code: String, isHost: Boolean) {
++        _uiState.update { it.copy(isHost = isHost) }
++        engine.connect(BuildConfig.SUPABASE_URL, BuildConfig.SUPABASE_ANON_KEY, code)
++    }
++
++    private fun validUsername(name: String): Boolean = name.length in 2..20
++
++    private fun saveUsername(username: String) {
++        prefs.edit().putString(KEY_USERNAME, username).apply()
++    }
++
++    private fun generateRoomCode(): String {
++        val alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
++        val random = SecureRandom()
++        return buildString {
++            repeat(6) { append(alphabet[random.nextInt(alphabet.length)]) }
++        }
++    }
++
++    /** Host: watch the shared player and broadcast every meaningful change. */
++    private fun observePlayer() {
++        viewModelScope.launch {
++            musicPlayer.state.collect { player ->
++                val state = _uiState.value
++                // Joiner: apply a pending seek once the room track is loaded.
++                if (!state.isHost && pendingSeekMs != null) {
++                    val target = pendingVideoId
++                    if (target != null && player.current?.videoId == target) {
++                        val seekTo = pendingSeekMs
++                        pendingSeekMs = null
++                        pendingVideoId = null
++                        if (seekTo != null) {
++                            viewModelScope.launch(Dispatchers.Main) { musicPlayer.seekTo(seekTo) }
++                        }
++                    } else if (System.currentTimeMillis() - pendingSeekSetAtMs > 10_000) {
++                        pendingSeekMs = null
++                        pendingVideoId = null
++                    }
++                }
++                if (!state.inRoom || !state.isHost) return@collect
++                val videoId = player.current?.videoId
++                if (videoId != lastBroadcastVideoId || player.isPlaying != lastBroadcastPlaying) {
++                    lastBroadcastVideoId = videoId
++                    lastBroadcastPlaying = player.isPlaying
++                    broadcastCurrentState(playerPositionMs = player.positionMs)
++                } else {
++                    // Seek detection: position jumped far beyond natural progress.
++                    val now = System.currentTimeMillis()
++                    val delta = player.positionMs - lastHostPositionMs
++                    val elapsed = now - lastHostEmittedAtMs
++                    if (delta < -400 || delta > elapsed + 1_500) {
++                        broadcastCurrentState(playerPositionMs = player.positionMs)
++                    }
++                }
++                lastHostPositionMs = player.positionMs
++                lastHostEmittedAtMs = System.currentTimeMillis()
++            }
++        }
++    }
++
++    /** Host: heartbeat keeps joiners aligned even without other changes. */
++    private fun startHeartbeat() {
++        if (heartbeatStarted) return
++        heartbeatStarted = true
++        viewModelScope.launch {
++            while (true) {
++                kotlinx.coroutines.delay(3_000)
++                val state = _uiState.value
++                if (state.inRoom && state.isHost && state.connection is TogetherConnection.Connected) {
++                    broadcastCurrentState()
++                }
++            }
++        }
++    }
++
++    private fun broadcastCurrentState(playerPositionMs: Long? = null) {
++        val state = _uiState.value
++        if (!state.inRoom || !state.isHost) return
++        val player = musicPlayer.state.value
++        val roomState = TogetherRoomState(
++            trackVideoId = player.current?.videoId,
++            title = player.current?.title,
++            artist = player.current?.artist,
++            artworkUrl = player.current?.artworkUrl,
++            durationMs = player.durationMs,
++            positionMs = playerPositionMs ?: player.positionMs,
++            playing = player.isPlaying,
++            updatedAtMs = System.currentTimeMillis(),
++            senderId = selfId,
++            senderName = state.username,
++            isHost = true,
++        )
++        _uiState.update { it.copy(roomTrack = roomState) }
++        engine.sendState(roomState)
++    }
++
++    /** Joiner: apply the host's snapshot to the shared player. */
++    private fun onRoomStateReceived(roomState: TogetherRoomState) {
++        if (roomState.senderId == selfId) return
++        _uiState.update { it.copy(roomTrack = roomState) }
++        val state = _uiState.value
++        if (state.isHost || !state.inRoom) return
++        if (!state.autoSync) return
++        val videoId = roomState.trackVideoId ?: return
++        viewModelScope.launch(Dispatchers.Main) {
++            val local = musicPlayer.state.value
++            if (local.current?.videoId != videoId) {
++                val track = PlayableTrack(
++                    title = roomState.title ?: "Unknown",
++                    artist = roomState.artist ?: "Unknown",
++                    artworkUrl = roomState.artworkUrl,
++                    videoId = videoId,
++                    durationMs = roomState.durationMs.takeIf { it > 0 },
++                )
++                pendingVideoId = videoId
++                pendingSeekMs = expectedPosition(roomState)
++                pendingSeekSetAtMs = System.currentTimeMillis()
++                musicPlayer.play(track, sourceLabel = "Together", startRadio = false)
++                if (roomState.playing) musicPlayer.resume() else musicPlayer.pause()
++            } else {
++                val expected = expectedPosition(roomState)
++                if (kotlin.math.abs(local.positionMs - expected) > DRIFT_TOLERANCE_MS) {
++                    musicPlayer.seekTo(expected)
++                }
++                if (roomState.playing != local.isPlaying) {
++                    if (roomState.playing) musicPlayer.resume() else musicPlayer.pause()
++                }
++            }
++        }
++    }
++
++    private fun expectedPosition(roomState: TogetherRoomState): Long {
++        if (!roomState.playing) return roomState.positionMs
++        val elapsed = System.currentTimeMillis() - roomState.updatedAtMs
++        return (roomState.positionMs + elapsed).coerceAtLeast(0L)
++    }
++
++    override fun onCleared() {
++        super.onCleared()
++        engine.disconnect()
++        engine.release()
++    }
++}
+diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
+index ef8ddcb..8d37e14 100644
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -328,4 +328,39 @@
+     <string name="settings_search_no_results_sub">Try checking for typos or searching with different keywords</string>
+     <string name="settings_search_clear">Clear search</string>
+     <string name="settings_search_title">Search settings</string>
++    <string name="nav_together">Together</string>
++    <string name="together_subtitle">Listen together, in perfect sync</string>
++    <string name="together_not_configured_title">Together isn't set up yet</string>
++    <string name="together_not_configured_text">This build has no realtime server configured. Add SUPABASE_URL and SUPABASE_ANON_KEY (see SUPABASE_SETUP.md), then reinstall to create and join rooms.</string>
++    <string name="together_status_label">Connection</string>
++    <string name="together_status_connected">Connected</string>
++    <string name="together_status_connecting">Connecting…</string>
++    <string name="together_status_disconnected">Disconnected</string>
++    <string name="together_status_failed">Connection failed</string>
++    <string name="together_room_code_label">Room code</string>
++    <string name="together_room_code_hint">6-character code</string>
++    <string name="together_username_label">Your name</string>
++    <string name="together_username_hint">What should others call you?</string>
++    <string name="together_create_room">Create room</string>
++    <string name="together_join_room">Join room</string>
++    <string name="together_leave_room">Leave room</string>
++    <string name="together_reconnect">Reconnect</string>
++    <string name="together_copy_code">Copy code</string>
++    <string name="together_copied">Code copied</string>
++    <string name="together_you_are_host">You are the host — your playback controls the room</string>
++    <string name="together_following">Following the host</string>
++    <string name="together_now_playing">Now playing in this room</string>
++    <string name="together_no_track">Nothing playing yet</string>
++    <string name="together_members">In this room</string>
++    <string name="together_settings_title">Settings</string>
++    <string name="together_autosync_title">Auto-sync playback</string>
++    <string name="together_autosync_desc">When off, you only watch the room — your player is not controlled.</string>
++    <string name="together_how_title">How it works</string>
++    <string name="together_how_1">1. One person creates a room and shares the 6-letter code.</string>
++    <string name="together_how_2">2. The other person enters the code and joins.</string>
++    <string name="together_how_3">3. The host plays, pauses, seeks or changes tracks — everyone hears the same moment.</string>
++    <string name="together_host_left">The host left the room.</string>
++    <string name="together_error_username">Please enter a name (2–20 characters).</string>
++    <string name="together_error_code">Enter the 6-character room code.</string>
++    <string name="together_error_not_configured">Together is not set up yet on this build.</string>
+ </resources>
