@@ -2404,10 +2404,10 @@ index 0000000..b1314d6
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
 new file mode 100644
-index 0000000..4980ac9
+index 0000000..820a150
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
-@@ -0,0 +1,992 @@
+@@ -0,0 +1,988 @@
 +package com.lastwave.app.ui.together
 +
 +import android.content.Context
@@ -2679,12 +2679,6 @@ index 0000000..4980ac9
 +    /** Record that a member is still here (any of their events counts). */
 +    private fun markSeen(memberId: String) {
 +        if (memberId != selfId) lastSeenMs[memberId] = System.currentTimeMillis()
-+    }
-+
-+    override fun onCleared() {
-+        presenceJob?.cancel()
-+        probeJob?.cancel()
-+        super.onCleared()
 +    }
 +
 +    fun onUsernameChange(value: String) {
@@ -3396,6 +3390,8 @@ index 0000000..4980ac9
 +    override fun onCleared() {
 +        super.onCleared()
 +        pendingPauseJob?.cancel()
++        presenceJob?.cancel()
++        probeJob?.cancel()
 +        engine.disconnect()
 +        engine.release()
 +    }
