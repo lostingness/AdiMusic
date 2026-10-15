@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 655dc41..c4baeaa 100644
+index 655dc41..b36e871 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -60,14 +60,21 @@ android {
@@ -8,8 +8,8 @@ index 655dc41..c4baeaa 100644
          targetSdk = 35
 -        versionCode = 27
 -        versionName = "4.2.7"
-+        versionCode = 32
-+        versionName = "4.2.12"
++        versionCode = 33
++        versionName = "4.2.13"
  
          val lastWaveLyricsToken = resolveSecret("LASTWAVE_LYRICS_TOKEN")
          val lastWaveLyricsUrl = resolveSecret("LASTWAVE_LYRICS_URL")
@@ -26,8 +26,780 @@ index 655dc41..c4baeaa 100644
          // Native secrets (addon client lock) live strictly in native .so via
          // SecretsBridge_generated.h (tools/generate_native_secrets.py).
          // No secret fields are exposed in DEX / BuildConfig.
+diff --git a/app/src/main/java/com/lastwave/app/ui/common/GlassButtons.kt b/app/src/main/java/com/lastwave/app/ui/common/GlassButtons.kt
+new file mode 100644
+index 0000000..4c7d40e
+--- /dev/null
++++ b/app/src/main/java/com/lastwave/app/ui/common/GlassButtons.kt
+@@ -0,0 +1,147 @@
++package com.lastwave.app.ui.common
++
++import androidx.compose.foundation.layout.PaddingValues
++import androidx.compose.foundation.layout.RowScope
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material3.Button
++import androidx.compose.material3.ButtonColors
++import androidx.compose.material3.ButtonDefaults
++import androidx.compose.material3.IconButton
++import androidx.compose.material3.OutlinedButton
++import androidx.compose.material3.TextButton
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Shape
++import androidx.compose.ui.unit.dp
++import com.lastwave.app.ui.theme.LiquidGlassPreset
++import com.lastwave.app.ui.theme.LocalLiquidGlass
++import com.lastwave.app.ui.theme.liquidGlassChrome
++import com.lastwave.app.ui.theme.liquidGlassContainerColor
++
++/**
++ * Buttons that become Liquid Glass whenever the global Liquid Glass
++ * setting is on (Settings → Appearance → Liquid Glass). With glass off
++ * they are pixel-identical to the plain Material3 buttons, so one toggle
++ * flips every converted button in the app — Home included — at once.
++ *
++ * The glass surface needs a backdrop to sample; MainShell provides the
++ * navigation backdrop to every tab. Where no backdrop exists the chrome
++ * returns the modifier unchanged, so these buttons safely fall back to
++ * their normal look instead of breaking.
++ */
++
++private val GlassButtonShape: Shape = RoundedCornerShape(24.dp)
++
++@Composable
++fun GlassButton(
++    onClick: () -> Unit,
++    modifier: Modifier = Modifier,
++    enabled: Boolean = true,
++    colors: ButtonColors = ButtonDefaults.buttonColors(),
++    shape: Shape? = null,
++    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
++    content: @Composable RowScope.() -> Unit,
++) {
++    val glass = LocalLiquidGlass.current
++    val effectiveShape = shape ?: if (glass) GlassButtonShape else ButtonDefaults.shape
++    Button(
++        onClick = onClick,
++        modifier = modifier.liquidGlassChrome(
++            effectiveShape,
++            glass,
++            LiquidGlassPreset.FloatingControls,
++        ),
++        enabled = enabled,
++        colors = if (glass) {
++            colors.copy(containerColor = liquidGlassContainerColor(colors.containerColor))
++        } else {
++            colors
++        },
++        shape = effectiveShape,
++        contentPadding = contentPadding,
++        content = content,
++    )
++}
++
++@Composable
++fun GlassOutlinedButton(
++    onClick: () -> Unit,
++    modifier: Modifier = Modifier,
++    enabled: Boolean = true,
++    colors: ButtonColors = ButtonDefaults.outlinedButtonColors(),
++    shape: Shape? = null,
++    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
++    content: @Composable RowScope.() -> Unit,
++) {
++    val glass = LocalLiquidGlass.current
++    val effectiveShape = shape ?: if (glass) GlassButtonShape else ButtonDefaults.outlinedShape
++    OutlinedButton(
++        onClick = onClick,
++        modifier = modifier.liquidGlassChrome(
++            effectiveShape,
++            glass,
++            LiquidGlassPreset.FloatingControls,
++        ),
++        enabled = enabled,
++        colors = if (glass) {
++            colors.copy(containerColor = liquidGlassContainerColor(colors.containerColor))
++        } else {
++            colors
++        },
++        shape = effectiveShape,
++        contentPadding = contentPadding,
++        content = content,
++    )
++}
++
++@Composable
++fun GlassTextButton(
++    onClick: () -> Unit,
++    modifier: Modifier = Modifier,
++    enabled: Boolean = true,
++    colors: ButtonColors = ButtonDefaults.textButtonColors(),
++    shape: Shape? = null,
++    contentPadding: PaddingValues = ButtonDefaults.ContentPadding,
++    content: @Composable RowScope.() -> Unit,
++) {
++    val glass = LocalLiquidGlass.current
++    val effectiveShape = shape ?: if (glass) GlassButtonShape else ButtonDefaults.textShape
++    TextButton(
++        onClick = onClick,
++        modifier = modifier.liquidGlassChrome(
++            effectiveShape,
++            glass,
++            LiquidGlassPreset.FloatingControls,
++        ),
++        enabled = enabled,
++        colors = if (glass) {
++            colors.copy(containerColor = liquidGlassContainerColor(colors.containerColor))
++        } else {
++            colors
++        },
++        shape = effectiveShape,
++        contentPadding = contentPadding,
++        content = content,
++    )
++}
++
++@Composable
++fun GlassIconButton(
++    onClick: () -> Unit,
++    modifier: Modifier = Modifier,
++    enabled: Boolean = true,
++    content: @Composable () -> Unit,
++) {
++    val glass = LocalLiquidGlass.current
++    IconButton(
++        onClick = onClick,
++        modifier = modifier.liquidGlassChrome(
++            CircleShape,
++            glass,
++            LiquidGlassPreset.FloatingControls,
++        ),
++        enabled = enabled,
++        content = content,
++    )
++}
+diff --git a/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt b/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt
+index 6ac6d59..58ea284 100644
+--- a/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt
++++ b/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt
+@@ -15,6 +15,10 @@ import androidx.compose.runtime.Composable
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.lerp
+ import androidx.compose.ui.unit.dp
++import com.lastwave.app.ui.theme.LiquidGlassPreset
++import com.lastwave.app.ui.theme.LocalLiquidGlass
++import com.lastwave.app.ui.theme.liquidGlassChrome
++import com.lastwave.app.ui.theme.liquidGlassContainerColor
+ 
+ 
+ /**
+@@ -34,6 +38,7 @@ import androidx.compose.ui.unit.dp
+  */
+ @Composable
+ fun OverflowMenuButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
++    val glass = LocalLiquidGlass.current
+     val darkThemeTone = lerp(
+         MaterialTheme.colorScheme.surfaceContainerHigh,
+         MaterialTheme.colorScheme.primaryContainer,
+@@ -43,10 +48,15 @@ fun OverflowMenuButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+         onClick = onClick,
+         shape = RoundedCornerShape(12.dp),
+         colors = IconButtonDefaults.filledTonalIconButtonColors(
+-            containerColor = darkThemeTone,
++            containerColor = liquidGlassContainerColor(darkThemeTone),
+             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+         ),
+         modifier = modifier
++            .liquidGlassChrome(
++                RoundedCornerShape(12.dp),
++                glass,
++                LiquidGlassPreset.FloatingControls,
++            )
+             .padding(start = 10.dp)
+             .width(26.dp)
+             .height(32.dp),
+diff --git a/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt b/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt
+index 26c6fcc..7f52206 100644
+--- a/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt
+@@ -56,13 +56,15 @@ import androidx.compose.material3.DropdownMenu
+ import androidx.compose.material3.DropdownMenuItem
+ import androidx.compose.material3.ExperimentalMaterial3Api
+ import androidx.compose.material3.Icon
+-import androidx.compose.material3.IconButton
+ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.material3.Surface
+ import androidx.compose.material3.Text
+ import androidx.compose.material3.TextButton
+ import com.lastwave.app.ui.common.ArtworkImage
+ import com.lastwave.app.ui.common.ExpressiveHeader
++import com.lastwave.app.ui.common.GlassButton
++import com.lastwave.app.ui.common.GlassIconButton
++import com.lastwave.app.ui.common.GlassOutlinedButton
+ import com.lastwave.app.ui.common.HeaderActionIcon
+ import com.lastwave.app.ui.common.safeHorizontalContentPadding
+ import com.lastwave.app.ui.common.adaptiveContentWidth
+@@ -191,7 +193,7 @@ fun HomeScreen(
+                     actions = {
+                         HeaderActionIcon(Icons.Filled.Download, "Downloads", onOpenDownloads)
+                         HeaderActionIcon(Icons.Filled.Search, "Search", onOpenSearch)
+-                        IconButton(onClick = onOpenSettings) {
++                        GlassIconButton(onClick = onOpenSettings) {
+                             ProfileAvatar(avatarUrl = uiState.stats?.avatarUrl, modifier = Modifier.size(38.dp))
+                         }
+                     },
+@@ -790,7 +792,7 @@ private fun StatsCard(
+                             modifier = Modifier.size(46.dp).align(Alignment.CenterEnd),
+                         ) {
+                             Box(contentAlignment = Alignment.Center) {
+-                                IconButton(onClick = onOpenGenres) {
++                                GlassIconButton(onClick = onOpenGenres) {
+                                     Icon(
+                                         Icons.AutoMirrored.Filled.ArrowForward,
+                                         contentDescription = "View genres",
+@@ -1247,7 +1249,7 @@ private fun HomeNowPlayingBanner(
+                         )
+                     }
+                 }
+-                IconButton(onClick = onMenuClick, modifier = Modifier.size(28.dp)) {
++                GlassIconButton(onClick = onMenuClick, modifier = Modifier.size(28.dp)) {
+                     Icon(
+                         Icons.Filled.MoreVert,
+                         contentDescription = "Menu",
+@@ -1303,7 +1305,7 @@ private fun HomeNowPlayingBanner(
+                 modifier = Modifier.fillMaxWidth(),
+                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+             ) {
+-                Button(
++                GlassButton(
+                     onClick = onPlay,
+                     modifier = Modifier.weight(1f).height(38.dp),
+                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+@@ -1314,7 +1316,7 @@ private fun HomeNowPlayingBanner(
+                     Spacer(Modifier.width(6.dp))
+                     Text("Play", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                 }
+-                androidx.compose.material3.OutlinedButton(
++                GlassOutlinedButton(
+                     onClick = onStartMix,
+                     modifier = Modifier.weight(1f).height(38.dp),
+                     shape = BadgePillShape,
+diff --git a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
+index 21d4f35..91a4973 100644
+--- a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
++++ b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
+@@ -399,7 +399,6 @@ fun LastWaveNavHost(
+                         }
+                     },
+                     onOpenDownloads = { navController.navigate(Screen.Downloads.route) },
+-                    onOpenModules = { navController.navigate(Screen.ProviderModules.route) },
+                     onOpenHomeSections = { navController.navigate(Screen.HomeSections.route) },
+                     onOpenExcludedSongs = { navController.navigate(Screen.ExcludedSongs.route) },
+                     onOpenYouTubeImport = { navController.navigate(Screen.YouTubeImport.route) },
+@@ -446,12 +445,6 @@ fun LastWaveNavHost(
+             }
+         }
+ 
+-        composable(Screen.ProviderModules.route) {
+-            PredictiveBackScreen(onBack = { navController.popBackStack() }) {
+-                com.lastwave.app.ui.settings.ModulesScreen(onBack = { navController.popBackStack() })
+-            }
+-        }
+-
+         composable(Screen.HomeSections.route) {
+             PredictiveBackScreen(onBack = { navController.popBackStack() }) {
+                 com.lastwave.app.ui.settings.HomeSectionsScreen(onBack = { navController.popBackStack() })
+diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
+index 0f03515..d115e30 100644
+--- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
+@@ -385,16 +385,6 @@ enum class SettingsTab(
+         subtitle = "Themes, Colors, Artwork, Lyrics",
+         icon = Icons.Filled.Palette,
+     ),
+-    YOUTUBE(
+-        title = "YouTube & Sync",
+-        subtitle = "Account connection, 24/7 Library sync, Channels, History",
+-        icon = Icons.Filled.CloudSync,
+-    ),
+-    LAST_FM(
+-        title = "Last.fm",
+-        subtitle = "Account connection, Scrobbling sync & API credentials",
+-        icon = Icons.Filled.Album,
+-    ),
+     LIBRARY(
+         title = "Library & Content",
+         subtitle = "Home layout, Playlist imports, Downloads, Exclusions",
+@@ -418,7 +408,6 @@ fun SettingsScreen(
+     onBack: () -> Unit = {},
+     onLoggedOut: () -> Unit = {},
+     onOpenDownloads: () -> Unit = {},
+-    onOpenModules: () -> Unit = {},
+     onOpenHomeSections: () -> Unit = {},
+     onOpenExcludedSongs: () -> Unit = {},
+     onOpenYouTubeImport: () -> Unit = {},
+@@ -656,43 +645,6 @@ fun SettingsScreen(
+             ) {
+                 when (tab) {
+                     null -> {
+-                        item {
+-                            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+-                                SectionLabel("Services & Add-ons")
+-                                SettingsGroup(rowCount = 3) { index, position ->
+-                                    when (index) {
+-                                        0 -> SettingsActionCard(
+-                                            icon = Icons.Filled.Extension,
+-                                            iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
+-                                            iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+-                                            title = stringResource(R.string.settings_modules_title),
+-                                            subtitle = stringResource(R.string.settings_modules_sub),
+-                                            onClick = onOpenModules,
+-                                            position = position,
+-                                            isHighlighted = (highlightedSettingId == "services.modules" || highlightedSettingId == "library.modules"),
+-                                        )
+-                                        1 -> SettingsActionCard(
+-                                            icon = Icons.Filled.Album,
+-                                            iconContainer = MaterialTheme.colorScheme.primaryContainer,
+-                                            iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+-                                            title = "Last.fm",
+-                                            subtitle = if (isLastFmConnected) "Connected as ${session.username} \u2022 Scrobbling active" else "Connect account, scrobbles & statistics sync",
+-                                            onClick = { activeTab = SettingsTab.LAST_FM },
+-                                            position = position,
+-                                        )
+-                                        else -> SettingsActionCard(
+-                                            icon = Icons.Filled.CloudSync,
+-                                            iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+-                                            iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+-                                            title = "YouTube & Sync",
+-                                            subtitle = if (ytConnection.isConnected) "Connected as ${ytConnection.accountName} \u2022 24/7 sync" else "Connect account, 24/7 playlist sync, channels",
+-                                            onClick = { activeTab = SettingsTab.YOUTUBE },
+-                                            position = position,
+-                                        )
+-                                    }
+-                                }
+-                            }
+-                        }
+ 
+                         item {
+                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+@@ -1291,211 +1243,6 @@ fun SettingsScreen(
+             }
+                     }
+ 
+-                    SettingsTab.YOUTUBE -> {
+-                        item {
+-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+-                    SectionLabel(stringResource(R.string.settings_section_youtube))
+-                    val ytConnected = ytConnection.isConnected
+-                    val syncSubtitle = when (val sync = ytSyncState) {
+-                        is com.lastwave.app.data.ytmusic.YtSyncState.Running ->
+-                            "Syncing ${sync.current}/${sync.total} \u2022 ${sync.label}"
+-                        is com.lastwave.app.data.ytmusic.YtSyncState.Completed ->
+-                            "Playlists mirror to your account \u2022 synced ${relativeTime(sync.atMillis)}"
+-                        is com.lastwave.app.data.ytmusic.YtSyncState.Failed ->
+-                            "Last pass failed \u2014 will retry automatically"
+-                        else ->
+-                            if (!ytConnected) "Connect an account first"
+-                            else if (ytSyncEnabled) "Selected playlists mirror to your account, 24/7" + lastSyncSuffix(ytLastSyncAt)
+-                            else "Keep your YT Music library in sync with AdiMusic"
+-                    }
+-                    // Display name of the active channel: the picked entry when
+-                    // the channel list was loaded, otherwise the stored name.
+-                    val currentChannelName = ytChannels.firstOrNull {
+-                        it.channelId == ytConnection.onBehalfOfUser &&
+-                            it.authUserIndex == ytConnection.authUserIndex &&
+-                            it.pageId == ytConnection.pageId
+-                    }?.accountName ?: ytConnection.accountName
+-                    val ytRowCount = if (ytConnected) 7 else 2
+-                    SettingsGroup(rowCount = ytRowCount) { index, position ->
+-                        when (index) {
+-                            0 -> if (ytConnected) {
+-                                YouTubeAccountRow(
+-                                    accountName = ytConnection.accountName,
+-                                    channelHandle = ytConnection.channelHandle,
+-                                    onDisconnect = { showYtDisconnectConfirm = true },
+-                                    position = position,
+-                                    isHighlighted = (highlightedSettingId == "youtube.account"),
+-                                )
+-                            } else {
+-                                SettingsActionCard(
+-                                    icon = Icons.Filled.CloudSync,
+-                                    iconContainer = MaterialTheme.colorScheme.primaryContainer,
+-                                    iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+-                                    title = stringResource(R.string.settings_connect_yt),
+-                                    subtitle = stringResource(R.string.settings_connect_yt_sub),
+-                                    onClick = onOpenYouTubeLogin,
+-                                    position = position,
+-                                    isHighlighted = (highlightedSettingId == "youtube.account"),
+-                                )
+-                            }
+-                            1 -> SettingsToggleCard(
+-                                icon = Icons.Filled.CloudSync,
+-                                iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+-                                iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+-                                title = stringResource(R.string.settings_yt_sync),
+-                                subtitle = syncSubtitle,
+-                                checked = ytConnected && ytSyncEnabled,
+-                                onCheckedChange = viewModel::setYtSyncEnabled,
+-                                position = position,
+-                                isHighlighted = (highlightedSettingId == "youtube.sync"),
+-                            )
+-                            2 -> if (ytConnected) {
+-                                SettingsActionCard(
+-                                    icon = Icons.Filled.SwitchAccount,
+-                                    iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+-                                    iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+-                                    title = "YouTube channel",
+-                                    subtitle = currentChannelName.ifBlank { "Default channel" },
+-                                    onClick = {
+-                                        viewModel.loadYtChannels()
+-                                        showYtChannelSheet = true
+-                                    },
+-                                    position = position,
+-                                    isHighlighted = (highlightedSettingId == "youtube.channel"),
+-                                )
+-                            }
+-                            3 -> if (ytConnected) {
+-                                val selectedCount = syncedPlaylistIds?.size ?: allPlaylists.size
+-                                val syncCountText = if (syncedPlaylistIds == null || selectedCount == allPlaylists.size) {
+-                                    "All (${allPlaylists.size}) playlists syncing"
+-                                } else {
+-                                    "$selectedCount of ${allPlaylists.size} playlists selected"
+-                                }
+-                                SettingsActionCard(
+-                                    icon = Icons.Filled.FormatListBulleted,
+-                                    iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
+-                                    iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+-                                    title = stringResource(R.string.settings_select_playlists),
+-                                    subtitle = syncCountText,
+-                                    onClick = { showSyncPlaylistsSheet = true },
+-                                    position = position,
+-                                    isHighlighted = (highlightedSettingId == "youtube.select_playlists"),
+-                                )
+-                            } else {
+-                                SettingsActionCard(
+-                                    icon = Icons.Filled.QueueMusic,
+-                                    iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
+-                                    iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+-                                    title = "Import from YouTube Music",
+-                                    subtitle = "Search, browse, or paste playlist links & IDs",
+-                                    onClick = onOpenYouTubeImport,
+-                                    position = position,
+-                                    isHighlighted = (highlightedSettingId == "youtube.import"),
+-                                )
+-                            }
+-                            4 -> if (ytConnected) {
+-                                val shownCount = ytAccountPlaylists.count { it.id !in hiddenYtLibraryPlaylistIds }
+-                                val visibilitySubtitle = if (shownCount == ytAccountPlaylists.size) {
+-                                    "All (${ytAccountPlaylists.size}) account playlists shown"
+-                                } else {
+-                                    "$shownCount of ${ytAccountPlaylists.size} account playlists shown"
+-                                }
+-                                SettingsActionCard(
+-                                    icon = Icons.Filled.Visibility,
+-                                    iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+-                                    iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+-                                    title = stringResource(R.string.settings_yt_shown),
+-                                    subtitle = visibilitySubtitle,
+-                                    onClick = { showYtLibraryVisibilitySheet = true },
+-                                    position = position,
+-                                    isHighlighted = (highlightedSettingId == "youtube.shown_playlists"),
+-                                )
+-                            }
+-                            5 -> SettingsActionCard(
+-                                icon = Icons.Filled.QueueMusic,
+-                                iconContainer = MaterialTheme.colorScheme.primaryContainer,
+-                                iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+-                                title = stringResource(R.string.settings_make_local),
+-                                subtitle = stringResource(R.string.settings_make_local_sub),
+-                                onClick = onOpenYouTubeImport,
+-                                position = position,
+-                                isHighlighted = (highlightedSettingId == "youtube.import"),
+-                            )
+-                            6 -> if (ytConnected) {
+-                                SettingsToggleCard(
+-                                    icon = Icons.Filled.History,
+-                                    iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
+-                                    iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
+-                                    title = stringResource(R.string.settings_yt_history),
+-                                    subtitle = if (ytHistorySyncEnabled) {
+-                                        "On • songs you listen to in AdiMusic, including lossless & downloads, appear in your YouTube Music history"
+-                                    } else {
+-                                        "Off • listening in AdiMusic stays out of your YouTube Music history"
+-                                    },
+-                                    checked = ytHistorySyncEnabled,
+-                                    onCheckedChange = viewModel::setYtHistorySyncEnabled,
+-                                    position = position,
+-                                    isHighlighted = (highlightedSettingId == "youtube.history"),
+-                                )
+-                            }
+-                        }
+-                    }
+-                }
+-            }
+-                    }
+-
+-                    SettingsTab.LAST_FM -> {
+-                        item {
+-                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+-                    SectionLabel("Integrations / Scrobbling")
+-                    // Last.fm is optional here — never a gate. Connected:
+-                    // global scrobbles + stats sync. Disconnected: Stats and
+-                    // recommendations run local-first from Room.
+-                    LastFmIntegrationCard(
+-                        isConnected = isLastFmConnected,
+-                        username = session.username,
+-                        avatarUrl = avatarUrl,
+-                        connecting = lastFmConnecting,
+-                        awaitingApproval = lastFmAuthUrl != null,
+-                        hasApiKey = hasApiKey,
+-                        isHighlighted = (highlightedSettingId in listOf("lastfm.connect", "lastfm.api_credentials")),
+-                        onConnect = { viewModel.beginLastFmConnect() },
+-                        onCancel = viewModel::cancelLastFmConnect,
+-                        onDisconnect = viewModel::disconnectLastFm,
+-                        onSaveKeys = viewModel::saveApiCredentials,
+-                        onRemoveKey = viewModel::clearApiKey,
+-                        onOpenCreateKeyPage = {
+-                            runCatching {
+-                                androidx.browser.customtabs.CustomTabsIntent.Builder().build()
+-                                    .launchUrl(context, android.net.Uri.parse(LAST_FM_CREATE_KEY_URL))
+-                            }.onFailure {
+-                                viewModel.showToast("No browser available to open Last.fm")
+-                            }
+-                        },
+-                    )
+-                    // Discord presence, next to Last.fm because both are "tell
+-                    // other services what I'm listening to" integrations and
+-                    // neither is required for playback. Unlike Last.fm this
+-                    // needs no account in LastWave — it publishes as the
+-                    // LastWave application through the Discord app itself, so
+-                    // the copy says exactly that.
+-                    SettingsToggleCard(
+-                        icon = Icons.Filled.Public,
+-                        iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+-                        iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+-                        title = "Discord Rich Presence",
+-                        subtitle = if (discordPresenceEnabled) {
+-                            "On • your track, quality and cover show on your Discord profile"
+-                        } else {
+-                            "Off • AdiMusic stays off your Discord profile"
+-                        },
+-                        checked = discordPresenceEnabled,
+-                        onCheckedChange = viewModel::setDiscordPresenceEnabled,
+-                        isHighlighted = (highlightedSettingId == "discord.presence"),
+-                    )
+-                }
+-            }
+-                    }
+ 
+ 
+ 
+@@ -3576,13 +3323,6 @@ private fun AboutCard(versionName: String) {
+                 )
+             }
+             Spacer(Modifier.height(12.dp))
+-            Text(
+-                "Built with the Last.fm API",
+-                style = MaterialTheme.typography.bodySmall,
+-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+-                textAlign = TextAlign.Center,
+-            )
+-            Spacer(Modifier.height(4.dp))
+             Text(
+                 "Developed by Aditya Jha",
+                 style = MaterialTheme.typography.bodySmall,
+diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
+index bd29df0..0c1f367 100644
+--- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
++++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
+@@ -627,184 +627,6 @@ object SettingsSearchIndex {
+                 )
+             )
+ 
+-            // ==========================================
+-            // TAB: YOUTUBE & SYNC
+-            // ==========================================
+-            add(
+-                SettingsEntry(
+-                    id = "youtube.account",
+-                    title = "YouTube Account Connection",
+-                    subtitle = "Connect or manage your Google / YouTube Music account",
+-                    keywords = listOf(
+-                        "youtube", "google account", "yt music", "login", "sign in", "oauth",
+-                        "connect youtube", "disconnect youtube", "account"
+-                    ),
+-                    icon = Icons.Filled.CloudSync,
+-                    iconContainer = { MaterialTheme.colorScheme.primaryContainer },
+-                    iconTint = { MaterialTheme.colorScheme.onPrimaryContainer },
+-                    parentTab = SettingsTab.YOUTUBE,
+-                    section = "YouTube & Sync",
+-                    type = EntryType.ACTION,
+-                )
+-            )
+-            add(
+-                SettingsEntry(
+-                    id = "youtube.sync",
+-                    title = "24/7 Library Sync",
+-                    subtitle = "Keep playlists and favorites continuously synced with YouTube Music",
+-                    keywords = listOf(
+-                        "youtube sync", "library sync", "cloud sync", "auto sync", "mirror playlists",
+-                        "24/7 sync", "background sync", "sync interval"
+-                    ),
+-                    icon = Icons.Filled.CloudSync,
+-                    iconContainer = { MaterialTheme.colorScheme.secondaryContainer },
+-                    iconTint = { MaterialTheme.colorScheme.onSecondaryContainer },
+-                    parentTab = SettingsTab.YOUTUBE,
+-                    section = "YouTube & Sync",
+-                    type = EntryType.TOGGLE,
+-                )
+-            )
+-            add(
+-                SettingsEntry(
+-                    id = "youtube.channel",
+-                    title = "YouTube Channel",
+-                    subtitle = "Switch between personal and brand channels linked to your account",
+-                    keywords = listOf(
+-                        "youtube channel", "brand account", "channel selector", "switch channel",
+-                        "yt profile", "sub channel"
+-                    ),
+-                    icon = Icons.Filled.SwitchAccount,
+-                    iconContainer = { MaterialTheme.colorScheme.secondaryContainer },
+-                    iconTint = { MaterialTheme.colorScheme.onSecondaryContainer },
+-                    parentTab = SettingsTab.YOUTUBE,
+-                    section = "YouTube & Sync",
+-                    type = EntryType.ACTION,
+-                )
+-            )
+-            add(
+-                SettingsEntry(
+-                    id = "youtube.select_playlists",
+-                    title = "Select Playlists to Sync",
+-                    subtitle = "Choose specific playlists to mirror with your YouTube Music account",
+-                    keywords = listOf(
+-                        "sync playlists", "playlist selection", "choose playlists", "mirror playlists",
+-                        "synced playlists", "filter sync"
+-                    ),
+-                    icon = Icons.Filled.FormatListBulleted,
+-                    iconContainer = { MaterialTheme.colorScheme.tertiaryContainer },
+-                    iconTint = { MaterialTheme.colorScheme.onTertiaryContainer },
+-                    parentTab = SettingsTab.YOUTUBE,
+-                    section = "YouTube & Sync",
+-                    type = EntryType.ACTION,
+-                )
+-            )
+-            add(
+-                SettingsEntry(
+-                    id = "youtube.shown_playlists",
+-                    title = "Show / Hide Account Playlists",
+-                    subtitle = "Control which playlists from your YouTube account appear in AdiMusic",
+-                    keywords = listOf(
+-                        "show playlists", "hide playlists", "visibility", "account playlists",
+-                        "library visibility", "filter playlists"
+-                    ),
+-                    icon = Icons.Filled.Visibility,
+-                    iconContainer = { MaterialTheme.colorScheme.secondaryContainer },
+-                    iconTint = { MaterialTheme.colorScheme.onSecondaryContainer },
+-                    parentTab = SettingsTab.YOUTUBE,
+-                    section = "YouTube & Sync",
+-                    type = EntryType.ACTION,
+-                )
+-            )
+-            add(
+-                SettingsEntry(
+-                    id = "youtube.import",
+-                    title = "Import from YouTube Music",
+-                    subtitle = "Search, browse, or paste playlist links & IDs to import into library",
+-                    keywords = listOf(
+-                        "import youtube", "import playlist", "paste link", "yt import", "copy playlist",
+-                        "transfer youtube", "make local"
+-                    ),
+-                    icon = Icons.Filled.QueueMusic,
+-                    iconContainer = { MaterialTheme.colorScheme.primaryContainer },
+-                    iconTint = { MaterialTheme.colorScheme.onPrimaryContainer },
+-                    parentTab = SettingsTab.YOUTUBE,
+-                    section = "YouTube & Sync",
+-                    type = EntryType.ACTION,
+-                )
+-            )
+-            add(
+-                SettingsEntry(
+-                    id = "youtube.history",
+-                    title = "YouTube Music Listening History",
+-                    subtitle = "Record plays and scrobbles in your official YouTube Music history",
+-                    keywords = listOf(
+-                        "youtube history", "watch history", "yt history sync", "scrobble to youtube",
+-                        "listening history", "sync plays"
+-                    ),
+-                    icon = Icons.Filled.History,
+-                    iconContainer = { MaterialTheme.colorScheme.tertiaryContainer },
+-                    iconTint = { MaterialTheme.colorScheme.onTertiaryContainer },
+-                    parentTab = SettingsTab.YOUTUBE,
+-                    section = "YouTube & Sync",
+-                    type = EntryType.TOGGLE,
+-                )
+-            )
+-
+-            // ==========================================
+-            // TAB: LAST.FM
+-            // ==========================================
+-            add(
+-                SettingsEntry(
+-                    id = "lastfm.connect",
+-                    title = "Last.fm Account Connection",
+-                    subtitle = "Connect Last.fm account for global scrobbling, loved tracks, and listening stats",
+-                    keywords = listOf(
+-                        "lastfm", "last.fm", "scrobble", "scrobbling", "login lastfm", "connect lastfm",
+-                        "auth", "stats", "loved tracks", "profile"
+-                    ),
+-                    icon = Icons.Filled.Album,
+-                    iconContainer = { MaterialTheme.colorScheme.primaryContainer },
+-                    iconTint = { MaterialTheme.colorScheme.onPrimaryContainer },
+-                    parentTab = SettingsTab.LAST_FM,
+-                    section = "Integrations / Scrobbling",
+-                    type = EntryType.ACTION,
+-                )
+-            )
+-            add(
+-                SettingsEntry(
+-                    id = "lastfm.api_credentials",
+-                    title = "Last.fm Custom API Credentials",
+-                    subtitle = "Configure custom Last.fm API key and secret to bypass shared rate limits",
+-                    keywords = listOf(
+-                        "lastfm api key", "custom api", "api secret", "developer key", "credentials",
+-                        "rate limit", "last.fm token"
+-                    ),
+-                    icon = Icons.Filled.Code,
+-                    iconContainer = { MaterialTheme.colorScheme.secondaryContainer },
+-                    iconTint = { MaterialTheme.colorScheme.onSecondaryContainer },
+-                    parentTab = SettingsTab.LAST_FM,
+-                    section = "Integrations / Scrobbling",
+-                    type = EntryType.ACTION,
+-                )
+-            )
+-            add(
+-                SettingsEntry(
+-                    id = "discord.presence",
+-                    title = "Discord Rich Presence",
+-                    subtitle = "Show the playing track, quality and cover on your Discord profile",
+-                    keywords = listOf(
+-                        "discord", "rich presence", "discord rpc", "now playing discord",
+-                        "discord status", "listening to", "presence", "show what im playing"
+-                    ),
+-                    icon = Icons.Filled.Public,
+-                    iconContainer = { MaterialTheme.colorScheme.secondaryContainer },
+-                    iconTint = { MaterialTheme.colorScheme.onSecondaryContainer },
+-                    parentTab = SettingsTab.LAST_FM,
+-                    section = "Integrations / Scrobbling",
+-                    type = EntryType.TOGGLE,
+-                )
+-            )
+-
+             // ==========================================
+             // TAB: NOTIFICATION SCROBBLER
+             // ==========================================
 diff --git a/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt b/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
-index 33b6163..9a36be9 100644
+index 33b6163..9297df7 100644
 --- a/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
 @@ -48,6 +48,7 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -38,7 +810,23 @@ index 33b6163..9a36be9 100644
  import androidx.compose.material.icons.filled.Home
  import androidx.compose.material.icons.filled.Leaderboard
  import androidx.compose.material3.Icon
-@@ -159,6 +160,7 @@ private enum class MainTab(val labelRes: Int) {
+@@ -56,6 +57,7 @@ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.material3.Surface
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableIntStateOf
+ import androidx.compose.runtime.mutableStateMapOf
+@@ -127,6 +129,7 @@ import com.kyant.backdrop.shadow.Shadow
+ import kotlin.math.sign
+ import com.lastwave.app.ui.theme.LocalIsDarkTheme
+ import com.lastwave.app.ui.theme.LocalLiquidGlass
++import com.lastwave.app.ui.theme.LocalLiquidGlassBackdrop
+ import com.lastwave.app.ui.theme.LiquidGlassPreset
+ import com.lastwave.app.ui.theme.liquidGlassChrome
+ import com.lastwave.app.ui.theme.liquidGlassContainerColor
+@@ -159,6 +162,7 @@ private enum class MainTab(val labelRes: Int) {
      FEED(com.lastwave.app.R.string.nav_feed),
      STATS(com.lastwave.app.R.string.nav_stats),
      PLAYLISTS(com.lastwave.app.R.string.nav_playlists),
@@ -46,7 +834,17 @@ index 33b6163..9a36be9 100644
  }
  
  /** Shared with any screen hosted inside [MainShell] so their scrolling
-@@ -267,6 +269,7 @@ fun MainShell(
+@@ -232,6 +236,9 @@ fun MainShell(
+ 
+     Box(Modifier.fillMaxSize()) {
+         val feedIndex = tabs.indexOf(MainTab.FEED)
++        CompositionLocalProvider(
++            LocalLiquidGlassBackdrop provides if (navGlass) navigationBackdrop else null,
++        ) {
+         HorizontalPager(
+             state = pagerState,
+             beyondViewportPageCount = 0,
+@@ -267,9 +274,11 @@ fun MainShell(
                          onOpenPlaylist = onOpenPlaylist,
                          onOpenSpotifyImport = onOpenSpotifyImport,
                      )
@@ -54,7 +852,11 @@ index 33b6163..9a36be9 100644
                  }
              }
          }
-@@ -623,4 +626,5 @@ private fun MainTab.icon(): ImageVector = when (this) {
++        }
+ 
+         // App update prompt banner (only shown on app open when an update is available and not dismissed)
+         AnimatedVisibility(
+@@ -623,4 +632,5 @@ private fun MainTab.icon(): ImageVector = when (this) {
      MainTab.FEED -> Icons.Filled.Home
      MainTab.STATS -> Icons.Filled.Leaderboard
      MainTab.PLAYLISTS -> Icons.AutoMirrored.Filled.QueueMusic
@@ -62,10 +864,10 @@ index 33b6163..9a36be9 100644
  }
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
 new file mode 100644
-index 0000000..72e5682
+index 0000000..4fc3187
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
-@@ -0,0 +1,566 @@
+@@ -0,0 +1,659 @@
 +package com.lastwave.app.ui.together
 +
 +import androidx.compose.foundation.background
@@ -78,6 +880,7 @@ index 0000000..72e5682
 +import androidx.compose.foundation.layout.fillMaxSize
 +import androidx.compose.foundation.layout.fillMaxWidth
 +import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.heightIn
 +import androidx.compose.foundation.layout.padding
 +import androidx.compose.foundation.layout.size
 +import androidx.compose.foundation.layout.width
@@ -92,14 +895,11 @@ index 0000000..72e5682
 +import androidx.compose.material.icons.filled.Group
 +import androidx.compose.material.icons.filled.MusicNote
 +import androidx.compose.material.icons.filled.PlayArrow
-+import androidx.compose.material3.IconButton
-+import androidx.compose.material3.TextButton
-+import androidx.compose.material3.Button
++import androidx.compose.material3.AlertDialog
 +import androidx.compose.material3.Card
 +import androidx.compose.material3.CardDefaults
 +import androidx.compose.material3.Icon
 +import androidx.compose.material3.MaterialTheme
-+import androidx.compose.material3.OutlinedButton
 +import androidx.compose.material3.OutlinedTextField
 +import androidx.compose.material3.Surface
 +import androidx.compose.material3.Switch
@@ -121,6 +921,10 @@ index 0000000..72e5682
 +import androidx.lifecycle.compose.collectAsStateWithLifecycle
 +import com.lastwave.app.R
 +import com.lastwave.app.ui.common.ArtworkImage
++import com.lastwave.app.ui.common.GlassButton
++import com.lastwave.app.ui.common.GlassIconButton
++import com.lastwave.app.ui.common.GlassOutlinedButton
++import com.lastwave.app.ui.common.GlassTextButton
 +import com.lastwave.app.ui.common.ExpressiveHeader
 +import com.lastwave.app.ui.common.adaptiveContentWidth
 +import com.lastwave.app.ui.common.safeDrawingBottomPadding
@@ -234,7 +1038,7 @@ index 0000000..72e5682
 +                                    fontWeight = FontWeight.ExtraBold,
 +                                    letterSpacing = androidx.compose.ui.unit.TextUnit.Unspecified,
 +                                )
-+                                OutlinedButton(onClick = {
++                                GlassOutlinedButton(onClick = {
 +                                    clipboard.setText(AnnotatedString(state.roomCode))
 +                                    viewModel.onCopied()
 +                                }) {
@@ -314,13 +1118,13 @@ index 0000000..72e5682
 +                            }
 +                            Spacer(Modifier.height(14.dp))
 +                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-+                                OutlinedButton(
++                                GlassOutlinedButton(
 +                                    onClick = { viewModel.reconnect() },
 +                                    modifier = Modifier.weight(1f),
 +                                ) {
 +                                    Text(stringResource(R.string.together_reconnect))
 +                                }
-+                                Button(
++                                GlassButton(
 +                                    onClick = { viewModel.leaveRoom() },
 +                                    modifier = Modifier.weight(1f),
 +                                ) {
@@ -405,11 +1209,17 @@ index 0000000..72e5682
 +                                )
 +                            }
 +                            Spacer(Modifier.height(10.dp))
-+                            OutlinedButton(
++                            GlassOutlinedButton(
 +                                onClick = { viewModel.addCurrentSongToPlaylist() },
 +                                modifier = Modifier.fillMaxWidth(),
 +                            ) {
 +                                Text(stringResource(R.string.together_playlist_add_current))
++                            }
++                            GlassOutlinedButton(
++                                onClick = { viewModel.openImportDialog() },
++                                modifier = Modifier.fillMaxWidth(),
++                            ) {
++                                Text(stringResource(R.string.together_playlist_import))
 +                            }
 +                            if (state.roomPlaylist.isEmpty()) {
 +                                Spacer(Modifier.height(8.dp))
@@ -448,12 +1258,12 @@ index 0000000..72e5682
 +                                                maxLines = 1,
 +                                            )
 +                                        }
-+                                        IconButton(
++                                        GlassIconButton(
 +                                            onClick = { viewModel.playRoomPlaylistItem(item.videoId) },
 +                                        ) {
 +                                            Icon(Icons.Filled.PlayArrow, contentDescription = null)
 +                                        }
-+                                        IconButton(
++                                        GlassIconButton(
 +                                            onClick = { viewModel.removeFromRoomPlaylist(item.videoId) },
 +                                        ) {
 +                                            Icon(
@@ -463,7 +1273,7 @@ index 0000000..72e5682
 +                                        }
 +                                    }
 +                                }
-+                                TextButton(
++                                GlassTextButton(
 +                                    onClick = { viewModel.clearRoomPlaylist() },
 +                                    modifier = Modifier.fillMaxWidth(),
 +                                ) {
@@ -507,7 +1317,7 @@ index 0000000..72e5682
 +                                style = MaterialTheme.typography.bodyMedium,
 +                                color = MaterialTheme.colorScheme.onSurfaceVariant,
 +                            )
-+                            Button(
++                            GlassButton(
 +                                onClick = { viewModel.createRoom() },
 +                                enabled = state.configured,
 +                                modifier = Modifier.fillMaxWidth(),
@@ -541,7 +1351,7 @@ index 0000000..72e5682
 +                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
 +                                modifier = Modifier.fillMaxWidth(),
 +                            )
-+                            OutlinedButton(
++                            GlassOutlinedButton(
 +                                onClick = { viewModel.joinRoom() },
 +                                enabled = state.configured,
 +                                modifier = Modifier.fillMaxWidth(),
@@ -631,389 +1441,108 @@ index 0000000..72e5682
 +            }
 +        }
 +    }
-+}
-diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
-new file mode 100644
-index 0000000..b1496de
---- /dev/null
-+++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
-@@ -0,0 +1,364 @@
-+package com.lastwave.app.ui.together
 +
-+import kotlinx.coroutines.CoroutineScope
-+import kotlinx.coroutines.Dispatchers
-+import kotlinx.coroutines.Job
-+import kotlinx.coroutines.SupervisorJob
-+import kotlinx.coroutines.cancel
-+import kotlinx.coroutines.delay
-+import kotlinx.coroutines.launch
-+import kotlinx.serialization.Serializable
-+import kotlinx.serialization.encodeToString
-+import kotlinx.serialization.json.Json
-+import kotlinx.serialization.json.JsonElement
-+import kotlinx.serialization.json.JsonNull
-+import kotlinx.serialization.json.JsonObject
-+import kotlinx.serialization.json.JsonPrimitive
-+import kotlinx.serialization.json.jsonObject
-+import kotlinx.serialization.json.jsonPrimitive
-+import okhttp3.OkHttpClient
-+import okhttp3.Request
-+import okhttp3.Response
-+import okhttp3.WebSocket
-+import okhttp3.WebSocketListener
-+import java.util.concurrent.atomic.AtomicInteger
-+
-+/**
-+ * One playback snapshot shared across a Together room.
-+ * [updatedAtMs] is the sender's wall clock; receivers add the elapsed time
-+ * while the track is playing to compute the expected position (drift correction).
-+ */
-+@Serializable
-+data class TogetherRoomState(
-+    val v: Int = 1,
-+    val trackVideoId: String? = null,
-+    val title: String? = null,
-+    val artist: String? = null,
-+    val artworkUrl: String? = null,
-+    val durationMs: Long = 0L,
-+    val positionMs: Long = 0L,
-+    val playing: Boolean = false,
-+    val updatedAtMs: Long = 0L,
-+    val senderId: String = "",
-+    val senderName: String = "",
-+    val isHost: Boolean = false,
-+)
-+
-+@Serializable
-+data class TogetherMember(
-+    val id: String = "",
-+    val name: String = "",
-+    val isHost: Boolean = false,
-+)
-+
-+@Serializable
-+data class TogetherPlaylistItem(
-+    val videoId: String = "",
-+    val title: String = "",
-+    val artist: String = "",
-+    val artworkUrl: String? = null,
-+    val durationMs: Long = 0L,
-+    val addedBy: String = "",
-+)
-+
-+/**
-+ * The room's shared playlist. Keyed by the room code only — there is no
-+ * room name. The list is broadcast whole on every change (lists are small)
-+ * and receivers adopt the newest snapshot by [updatedAtMs]. It lives only
-+ * while the room is alive: when everyone leaves, it is gone.
-+ */
-+@Serializable
-+data class TogetherPlaylistState(
-+    val items: List<TogetherPlaylistItem> = emptyList(),
-+    val updatedAtMs: Long = 0L,
-+    val senderId: String = "",
-+)
-+sealed interface TogetherConnection {
-+    data object Disconnected : TogetherConnection
-+    data object Connecting : TogetherConnection
-+    data object Connected : TogetherConnection
-+    data class Failed(val message: String) : TogetherConnection
-+}
-+
-+@Serializable
-+private data class PhoenixMessage(
-+    val topic: String,
-+    val event: String,
-+    val payload: JsonElement = JsonNull,
-+    val ref: String? = null,
-+)
-+
-+@Serializable
-+private data class PhoenixJoinConfig(val broadcast: PhoenixBroadcastConfig)
-+
-+@Serializable
-+private data class PhoenixBroadcastConfig(val self: Boolean)
-+
-+@Serializable
-+private data class PhoenixJoinPayload(val config: PhoenixJoinConfig)
-+
-+@Serializable
-+private data class PhoenixBroadcastOut(val event: String, val payload: JsonElement)
-+
-+/**
-+ * Minimal Supabase Realtime client speaking the Phoenix-channels protocol
-+ * over an OkHttp WebSocket. No new dependencies: the app already ships
-+ * OkHttp + kotlinx-serialization.
-+ *
-+ * Channel: `realtime:together:<CODE>` — broadcast only, no tables needed.
-+ * The room code itself is the access control: codes are 6 chars from a
-+ * 31-symbol alphabet generated with SecureRandom (~887M combinations).
-+ */
-+class TogetherSyncEngine {
-+
-+    var onConnection: ((TogetherConnection) -> Unit)? = null
-+    var onError: ((String) -> Unit)? = null
-+    var onRoomState: ((TogetherRoomState) -> Unit)? = null
-+    var onMemberHello: ((TogetherMember) -> Unit)? = null
-+    var onMemberBye: ((TogetherMember) -> Unit)? = null
-+    var onStateRequested: ((TogetherMember) -> Unit)? = null
-+    var onPlaylist: ((TogetherPlaylistState) -> Unit)? = null
-+
-+    private val json = Json { ignoreUnknownKeys = true }
-+    private val client = OkHttpClient()
-+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-+    private val refCounter = AtomicInteger(0)
-+
-+    @Volatile private var socket: WebSocket? = null
-+    @Volatile private var topic: String = ""
-+    @Volatile private var shouldStayConnected = false
-+    @Volatile private var reconnectAttempts = 0
-+    @Volatile private var lastUrl: String = ""
-+    @Volatile private var lastKey: String = ""
-+    @Volatile private var lastRoomCode: String = ""
-+    private var heartbeatJob: Job? = null
-+    private var reconnectJob: Job? = null
-+
-+    fun connect(supabaseUrl: String, anonKey: String, roomCode: String) {
-+        lastUrl = supabaseUrl
-+        lastKey = anonKey
-+        lastRoomCode = roomCode
-+        reconnectAttempts = 0
-+        dial()
-+    }
-+
-+    private fun dial() {
-+        // A pending reconnect timer must never fire after we already dialled:
-+        // it used to close the healthy socket and loop Connected/Disconnected.
-+        reconnectJob?.cancel()
-+        disconnectSocketOnly()
-+        val host = lastUrl
-+            .removePrefix("https://")
-+            .removePrefix("http://")
-+            .trimEnd('/')
-+        topic = "realtime:together:${lastRoomCode.uppercase()}"
-+        shouldStayConnected = true
-+        onConnection?.invoke(TogetherConnection.Connecting)
-+        val request = Request.Builder()
-+            .url("wss://$host/realtime/v1/websocket?apikey=$lastKey&vsn=1.0.0")
-+            .build()
-+        socket = client.newWebSocket(request, listener)
-+    }
-+
-+    fun disconnect() {
-+        shouldStayConnected = false
-+        reconnectJob?.cancel()
-+        heartbeatJob?.cancel()
-+        disconnectSocketOnly()
-+        onConnection?.invoke(TogetherConnection.Disconnected)
-+    }
-+
-+    /** Manual reconnect: dial again with the stored room params. */
-+    fun reconnect() {
-+        if (lastUrl.isBlank() || lastRoomCode.isBlank()) return
-+        reconnectAttempts = 0
-+        reconnectJob?.cancel()
-+        dial()
-+    }
-+
-+    fun sendState(state: TogetherRoomState) {
-+        sendBroadcast("together_state", json.encodeToString(state))
-+    }
-+
-+    fun sendHello(member: TogetherMember) {
-+        sendBroadcast("together_hello", json.encodeToString(member))
-+    }
-+
-+    fun sendBye(member: TogetherMember) {
-+        sendBroadcast("together_bye", json.encodeToString(member))
-+    }
-+
-+    fun sendStateRequest(member: TogetherMember) {
-+        sendBroadcast("together_request", json.encodeToString(member))
-+    }
-+
-+    fun sendPlaylist(state: TogetherPlaylistState) {
-+        sendBroadcast("together_playlist", json.encodeToString(state))
-+    }
-+
-+    private fun sendBroadcast(event: String, payloadJson: String) {
-+        val ws = socket ?: return
-+        if (topic.isBlank()) return
-+        val payload = json.parseToJsonElement(payloadJson)
-+        val msg = PhoenixMessage(
-+            topic = topic,
-+            event = "broadcast",
-+            payload = JsonObject(
-+                mapOf(
-+                    "event" to JsonPrimitive(event),
-+                    "payload" to payload,
-+                )
-+            ),
-+            ref = nextRef(),
-+        )
-+        ws.send(json.encodeToString(msg))
-+    }
-+
-+    private fun nextRef(): String = refCounter.incrementAndGet().toString()
-+
-+    private fun disconnectSocketOnly() {
-+        heartbeatJob?.cancel()
-+        try { socket?.close(1000, "leave") } catch (_: Exception) { }
-+        socket = null
-+    }
-+
-+    private fun startHeartbeat() {
-+        heartbeatJob?.cancel()
-+        heartbeatJob = scope.launch {
-+            while (true) {
-+                delay(25_000)
-+                val ws = socket ?: break
-+                val msg = PhoenixMessage(
-+                    topic = "phoenix",
-+                    event = "heartbeat",
-+                    payload = JsonObject(emptyMap()),
-+                    ref = nextRef(),
-+                )
-+                ws.send(json.encodeToString(msg))
-+            }
-+        }
-+    }
-+
-+    private fun scheduleReconnect() {
-+        if (!shouldStayConnected) return
-+        // Keep retrying on flaky mobile networks: never give up and strand
-+        // the room on Disconnected. Backoff caps at 30s; a dial is cheap.
-+        val attempt = reconnectAttempts++
-+        val delayMs = minOf(2_000L shl minOf(attempt, 4), 30_000L)
-+        reconnectJob?.cancel()
-+        reconnectJob = scope.launch {
-+            delay(delayMs)
-+            if (shouldStayConnected) dial()
-+        }
-+    }
-+
-+    private val listener = object : WebSocketListener() {
-+        override fun onOpen(webSocket: WebSocket, response: Response) {
-+            val join = PhoenixMessage(
-+                topic = topic,
-+                event = "phx_join",
-+                payload = JsonObject(
-+                    mapOf(
-+                        "config" to JsonObject(
-+                            mapOf(
-+                                "broadcast" to JsonObject(
-+                                    mapOf(
-+                                        "self" to JsonPrimitive(false),
-+                                        "ack" to JsonPrimitive(false),
-+                                    )
-+                                ),
-+                                "presence" to JsonObject(
-+                                    mapOf("key" to JsonPrimitive(""))
-+                                ),
-+                                "private" to JsonPrimitive(false),
-+                            )
-+                        )
++    // ---- import a playlist into the room ----
++    if (state.showImportDialog) {
++        AlertDialog(
++            onDismissRequest = { viewModel.closeImportDialog() },
++            title = { Text(stringResource(R.string.together_import_title)) },
++            text = {
++                Column(
++                    modifier = Modifier
++                        .fillMaxWidth()
++                        .verticalScroll(rememberScrollState())
++                        .heightIn(max = 380.dp),
++                    verticalArrangement = Arrangement.spacedBy(12.dp),
++                ) {
++                    Text(
++                        text = stringResource(R.string.together_import_spotify_label),
++                        style = MaterialTheme.typography.titleSmall,
++                        fontWeight = FontWeight.SemiBold,
 +                    )
-+                ),
-+                ref = nextRef(),
-+            )
-+            webSocket.send(json.encodeToString(join))
-+            startHeartbeat()
-+        }
-+
-+        override fun onMessage(webSocket: WebSocket, text: String) {
-+            // Ignore events from a stale socket: after a reconnect the old
-+            // socket can still deliver/close late, and acting on it used to
-+            // tear down the healthy connection.
-+            if (webSocket !== socket) return
-+            val parsed = runCatching { json.decodeFromString<PhoenixMessage>(text) }.getOrNull() ?: return
-+            when (parsed.event) {
-+                "phx_reply" -> {
-+                    val payloadObj = parsed.payload as? JsonObject
-+                    val status = payloadObj
-+                        ?.get("status")?.jsonPrimitive?.content
-+                    if (status == "ok") {
-+                        reconnectAttempts = 0
-+                        reconnectJob?.cancel()
-+                        onConnection?.invoke(TogetherConnection.Connected)
-+                    } else {
-+                        val response = payloadObj?.get("response")?.toString() ?: ""
-+                        onError?.invoke("Join rejected by server $response")
-+                        onConnection?.invoke(
-+                            TogetherConnection.Failed("Could not join room")
++                    OutlinedTextField(
++                        value = state.spotifyLink,
++                        onValueChange = viewModel::onSpotifyLinkChange,
++                        label = { Text(stringResource(R.string.together_import_spotify_hint)) },
++                        singleLine = true,
++                        modifier = Modifier.fillMaxWidth(),
++                    )
++                    GlassButton(
++                        onClick = { viewModel.importSpotifyIntoRoom() },
++                        enabled = !state.importingSpotify,
++                        modifier = Modifier.fillMaxWidth(),
++                    ) {
++                        Text(
++                            if (state.importingSpotify) {
++                                stringResource(R.string.together_import_spotify_importing)
++                            } else {
++                                stringResource(R.string.together_import_spotify_button)
++                            },
 +                        )
 +                    }
-+                }
-+                "broadcast" -> {
-+                    val inner = parsed.payload as? JsonObject ?: return
-+                    val event = inner["event"]?.jsonPrimitive?.content ?: return
-+                    val payload = inner["payload"] ?: return
-+                    when (event) {
-+                        "together_state" -> runCatching {
-+                            onRoomState?.invoke(json.decodeFromJsonElement(TogetherRoomState.serializer(), payload))
-+                        }
-+                        "together_hello" -> runCatching {
-+                            onMemberHello?.invoke(json.decodeFromJsonElement(TogetherMember.serializer(), payload))
-+                        }
-+                        "together_bye" -> runCatching {
-+                            onMemberBye?.invoke(json.decodeFromJsonElement(TogetherMember.serializer(), payload))
-+                        }
-+                        "together_request" -> runCatching {
-+                            onStateRequested?.invoke(json.decodeFromJsonElement(TogetherMember.serializer(), payload))
-+                        }
-+                        "together_playlist" -> runCatching {
-+                            onPlaylist?.invoke(json.decodeFromJsonElement(TogetherPlaylistState.serializer(), payload))
++                    Text(
++                        text = stringResource(R.string.together_import_my_playlists),
++                        style = MaterialTheme.typography.titleSmall,
++                        fontWeight = FontWeight.SemiBold,
++                    )
++                    if (state.importDialogPlaylists.isEmpty()) {
++                        Text(
++                            text = stringResource(R.string.together_import_empty),
++                            style = MaterialTheme.typography.bodyMedium,
++                            color = MaterialTheme.colorScheme.onSurfaceVariant,
++                        )
++                    } else {
++                        state.importDialogPlaylists.forEach { playlist ->
++                            Row(
++                                verticalAlignment = Alignment.CenterVertically,
++                                modifier = Modifier
++                                    .fillMaxWidth()
++                                    .clickable { viewModel.importPlaylistIntoRoom(playlist.id) }
++                                    .padding(vertical = 6.dp),
++                            ) {
++                                Column(Modifier.weight(1f)) {
++                                    Text(
++                                        text = playlist.title,
++                                        style = MaterialTheme.typography.bodyMedium,
++                                        fontWeight = FontWeight.SemiBold,
++                                        maxLines = 1,
++                                    )
++                                    Text(
++                                        text = "${playlist.trackCount} tracks",
++                                        style = MaterialTheme.typography.bodySmall,
++                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                    )
++                                }
++                                Icon(Icons.Filled.PlayArrow, contentDescription = null)
++                            }
 +                        }
 +                    }
 +                }
-+                "phx_close", "phx_error" -> {
-+                    onError?.invoke("Channel closed by server")
-+                    onConnection?.invoke(TogetherConnection.Disconnected)
-+                    scheduleReconnect()
++            },
++            confirmButton = {
++                GlassTextButton(onClick = { viewModel.closeImportDialog() }) {
++                    Text(stringResource(R.string.together_import_close))
 +                }
-+            }
-+        }
-+
-+        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
-+            if (webSocket !== socket) return
-+            heartbeatJob?.cancel()
-+            if (shouldStayConnected) {
-+                onConnection?.invoke(TogetherConnection.Disconnected)
-+                scheduleReconnect()
-+            }
-+        }
-+
-+        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-+            if (webSocket !== socket) return
-+            heartbeatJob?.cancel()
-+            onError?.invoke(t.message ?: "Connection failed")
-+            if (shouldStayConnected) {
-+                onConnection?.invoke(TogetherConnection.Disconnected)
-+                scheduleReconnect()
-+            }
-+        }
-+    }
-+
-+    fun release() {
-+        shouldStayConnected = false
-+        reconnectJob?.cancel()
-+        heartbeatJob?.cancel()
-+        disconnectSocketOnly()
-+        scope.cancel()
++            },
++        )
 +    }
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
 new file mode 100644
-index 0000000..5021ebe
+index 0000000..d236b3f
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
-@@ -0,0 +1,552 @@
+@@ -0,0 +1,728 @@
 +package com.lastwave.app.ui.together
 +
 +import android.content.Context
 +import androidx.lifecycle.ViewModel
 +import androidx.lifecycle.viewModelScope
 +import com.lastwave.app.BuildConfig
++import com.lastwave.app.data.generate.GeneratedTrack
++import com.lastwave.app.data.generate.youtubeVideoIdOrNull
++import com.lastwave.app.data.playlist.PlaylistRepository
++import com.lastwave.app.data.playlist.SpotifyPlaylistImporter
 +import com.lastwave.app.playback.MusicPlayer
 +import com.lastwave.app.playback.PlayableTrack
 +import dagger.hilt.android.lifecycle.HiltViewModel
@@ -1041,13 +1570,26 @@ index 0000000..5021ebe
 +    val members: List<TogetherMember> = emptyList(),
 +    val roomTrack: TogetherRoomState? = null,
 +    val roomPlaylist: List<TogetherPlaylistItem> = emptyList(),
++    val showImportDialog: Boolean = false,
++    val importDialogPlaylists: List<ImportablePlaylist> = emptyList(),
++    val spotifyLink: String = "",
++    val importingSpotify: Boolean = false,
 +    val lastError: String? = null,
 +    val autoSync: Boolean = true,
 +    val error: String? = null,
 +    val copied: Boolean = false,
 +)
 +
++/** One of the user's own saved playlists, offered for import into the room. */
++data class ImportablePlaylist(
++    val id: Long,
++    val title: String,
++    val trackCount: Int,
++)
 +private const val PREFS = "together_prefs"
++
++/** Title of the persistent playlist the room playlist auto-saves into. */
++private const val TOGETHER_SAVED_TITLE = "Together"
 +private const val KEY_USERNAME = "username"
 +private const val KEY_AUTO_SYNC = "auto_sync"
 +private const val KEY_SELF_ID = "self_id"
@@ -1059,6 +1601,14 @@ index 0000000..5021ebe
 + *  is sent to the room. Buffering stalls recover inside the window, so a
 + *  stall is never mistaken for a real pause. */
 +private const val PAUSE_CONFIRM_DELAY_MS = 1_200L
++
++/** Poll step while a pause waits out a buffering stall. */
++private const val PAUSE_CONFIRM_POLL_MS = 300L
++
++/** Longest a pause waits for a stall to clear. After this the pause is
++ *  dropped silently: a player still stalled this long was never paused by
++ *  the user, so the room must keep playing. */
++private const val PAUSE_CONFIRM_MAX_WAIT_MS = 10_000L
 +
 +/** The only connection problem text the UI ever shows: no hostnames, no
 + *  URLs, no technical detail. */
@@ -1079,6 +1629,8 @@ index 0000000..5021ebe
 +@HiltViewModel
 +class TogetherViewModel @Inject constructor(
 +    private val musicPlayer: MusicPlayer,
++    private val playlistRepository: PlaylistRepository,
++    private val spotifyPlaylistImporter: SpotifyPlaylistImporter,
 +    @ApplicationContext private val context: Context,
 +) : ViewModel() {
 +
@@ -1315,6 +1867,7 @@ index 0000000..5021ebe
 +        playlistUpdatedAtMs = now
 +        _uiState.update { it.copy(roomPlaylist = items, error = error) }
 +        broadcastPlaylist()
++        autoSaveRoomPlaylist(items)
 +    }
 +
 +    /** Re-send the current playlist without changing its timestamp. */
@@ -1337,7 +1890,138 @@ index 0000000..5021ebe
 +        if (playlist.updatedAtMs < playlistUpdatedAtMs) return
 +        playlistUpdatedAtMs = playlist.updatedAtMs
 +        _uiState.update { it.copy(roomPlaylist = playlist.items) }
++        autoSaveRoomPlaylist(playlist.items)
 +    }
++
++    /**
++     * Auto-save: whatever is in the room playlist is mirrored into the
++     * user's own persistent "Together" playlist, so the songs survive
++     * after the room ends. Runs on IO and never breaks the room if
++     * storage fails — the room is the source of truth.
++     */
++    private var togetherSavedPlaylistId: Long? = null
++
++    private fun autoSaveRoomPlaylist(items: List<TogetherPlaylistItem>) {
++        viewModelScope.launch(Dispatchers.IO) {
++            runCatching {
++                val id = togetherSavedPlaylistId
++                    ?: playlistRepository.findByTitle(TOGETHER_SAVED_TITLE, "custom")?.id
++                    ?: playlistRepository.createCustom(TOGETHER_SAVED_TITLE).id
++                togetherSavedPlaylistId = id
++                playlistRepository.replaceTracksForSync(
++                    id,
++                    items.map { it.toGeneratedTrack() },
++                )
++            }
++        }
++    }
++
++    /** Import dialog: list the user's own saved playlists. */
++    fun openImportDialog() {
++        viewModelScope.launch(Dispatchers.IO) {
++            val playlists = runCatching {
++                playlistRepository.getAll()
++                    .filter { it.mode == "custom" && it.tracks.isNotEmpty() }
++                    .map { ImportablePlaylist(it.id, it.title, it.tracks.size) }
++            }.getOrDefault(emptyList())
++            _uiState.update {
++                it.copy(showImportDialog = true, importDialogPlaylists = playlists, error = null)
++            }
++        }
++    }
++
++    fun closeImportDialog() {
++        _uiState.update { it.copy(showImportDialog = false) }
++    }
++
++    fun onSpotifyLinkChange(value: String) {
++        _uiState.update { it.copy(spotifyLink = value) }
++    }
++
++    /** Import one of the user's own playlists into the room. */
++    fun importPlaylistIntoRoom(id: Long) {
++        viewModelScope.launch(Dispatchers.IO) {
++            val saved = runCatching { playlistRepository.getById(id) }.getOrNull()
++            val items = saved?.tracks.orEmpty().mapNotNull { it.toRoomItem(_uiState.value.username) }
++            if (items.isEmpty()) {
++                _uiState.update { it.copy(error = "No playable tracks in this playlist") }
++                return@launch
++            }
++            mergeIntoRoomPlaylist(items)
++            _uiState.update { it.copy(showImportDialog = false) }
++        }
++    }
++
++    /** Import a public Spotify playlist link into the room. No Spotify
++     *  login needed: the app reads the public playlist page and matches
++     *  its tracks to playable songs. */
++    fun importSpotifyIntoRoom() {
++        val link = _uiState.value.spotifyLink.trim()
++        if (link.isEmpty()) {
++            _uiState.update { it.copy(error = "Paste a Spotify playlist link") }
++            return
++        }
++        _uiState.update { it.copy(importingSpotify = true, error = null) }
++        viewModelScope.launch(Dispatchers.IO) {
++            runCatching {
++                val result = spotifyPlaylistImporter.fetchAndMatch(link)
++                val items = result.tracks.mapNotNull { it.toRoomItem(_uiState.value.username) }
++                if (items.isEmpty()) {
++                    _uiState.update {
++                        it.copy(
++                            importingSpotify = false,
++                            error = "No tracks from that playlist could be matched. " +
++                                "Make sure the playlist is public.",
++                        )
++                    }
++                    return@runCatching
++                }
++                mergeIntoRoomPlaylist(items)
++                _uiState.update { it.copy(importingSpotify = false, showImportDialog = false) }
++            }.onFailure {
++                _uiState.update {
++                    it.copy(
++                        importingSpotify = false,
++                        error = "Could not read that playlist. Check the link and try again.",
++                    )
++                }
++            }
++        }
++    }
++
++    /** Merge new items into the room playlist (no duplicates), then
++     *  broadcast + auto-save through the single update path. */
++    private fun mergeIntoRoomPlaylist(newItems: List<TogetherPlaylistItem>) {
++        val state = _uiState.value
++        if (!state.inRoom) return
++        val existing = state.roomPlaylist.map { it.videoId }.toSet()
++        val merged = state.roomPlaylist + newItems.filterNot { it.videoId in existing }
++        if (merged.size == state.roomPlaylist.size) {
++            _uiState.update { it.copy(error = "Already in playlist") }
++            return
++        }
++        updatePlaylist(merged, error = null)
++    }
++
++    private fun GeneratedTrack.toRoomItem(addedBy: String): TogetherPlaylistItem? {
++        val videoId = youtubeVideoIdOrNull() ?: return null
++        return TogetherPlaylistItem(
++            videoId = videoId,
++            title = name,
++            artist = artist,
++            artworkUrl = artworkUrl,
++            durationMs = 0L,
++            addedBy = addedBy,
++        )
++    }
++
++    private fun TogetherPlaylistItem.toGeneratedTrack(): GeneratedTrack =
++        GeneratedTrack(
++            name = title,
++            artist = artist,
++            artworkUrl = artworkUrl,
++            url = "https://music.youtube.com/watch?v=$videoId",
++        )
 +
 +    fun reconnect() {
 +        engine.reconnect()
@@ -1419,14 +2103,26 @@ index 0000000..5021ebe
 +                        // would pause the other device for no reason, so
 +                        // wait: only a pause that still holds after the
 +                        // window, and is not buffering, reaches the room.
++                        // A pause pressed DURING a stall must not be lost:
++                        // pausing clears buffering, so the poll below sees
++                        // it and sends it once the stall flag drops.
 +                        lastBroadcastPlaying = false
 +                        pendingPauseJob?.cancel()
 +                        pendingPauseJob = viewModelScope.launch {
 +                            delay(PAUSE_CONFIRM_DELAY_MS)
-+                            val current = musicPlayer.state.value
-+                            if (!current.isPlaying && !current.isBuffering) {
-+                                broadcastCurrentState()
++                            var waitedMs = 0L
++                            while (waitedMs <= PAUSE_CONFIRM_MAX_WAIT_MS) {
++                                val current = musicPlayer.state.value
++                                if (current.isPlaying) return@launch // resumed: not a pause
++                                if (!current.isBuffering) {
++                                    broadcastCurrentState()
++                                    return@launch
++                                }
++                                delay(PAUSE_CONFIRM_POLL_MS)
++                                waitedMs += PAUSE_CONFIRM_POLL_MS
 +                            }
++                            // Still stalled after the max wait: not a user
++                            // pause, so send nothing — the room keeps playing.
 +                        }
 +                    }
 +                } else {
@@ -1470,6 +2166,11 @@ index 0000000..5021ebe
 +        if (pendingRoomState != null) return
 +        val player = musicPlayer.state.value
 +        if (player.error != null) return
++        // A stalled player (not playing, still buffering) is not paused:
++        // its state must never reach the room, or the other device would
++        // pause for a network stall. This also closes the heartbeat path,
++        // which otherwise broadcast stall states every 3 seconds.
++        if (!player.isPlaying && player.isBuffering) return
 +        val roomState = TogetherRoomState(
 +            trackVideoId = player.current?.videoId,
 +            title = player.current?.title,
@@ -1561,10 +2262,10 @@ index 0000000..5021ebe
 +    }
 +}
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index ef8ddcb..a29c2ae 100644
+index ef8ddcb..0b4e807 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
-@@ -328,4 +328,48 @@
+@@ -328,4 +328,57 @@
      <string name="settings_search_no_results_sub">Try checking for typos or searching with different keywords</string>
      <string name="settings_search_clear">Clear search</string>
      <string name="settings_search_title">Search settings</string>
@@ -1597,6 +2298,15 @@ index ef8ddcb..a29c2ae 100644
 +    <string name="together_playlist_add_current">Add current song</string>
 +    <string name="together_playlist_empty">Playlist is empty — add the song that is playing.</string>
 +    <string name="together_playlist_clear">Clear playlist</string>
++    <string name="together_playlist_import">Import playlist</string>
++    <string name="together_import_title">Import into room</string>
++    <string name="together_import_spotify_label">Spotify playlist</string>
++    <string name="together_import_spotify_hint">Paste a Spotify playlist link</string>
++    <string name="together_import_spotify_button">Import from Spotify</string>
++    <string name="together_import_spotify_importing">Importing…</string>
++    <string name="together_import_my_playlists">My playlists</string>
++    <string name="together_import_empty">No playlists yet</string>
++    <string name="together_import_close">Close</string>
 +    <string name="together_playlist_remove">Remove from playlist</string>
 +    <string name="together_now_playing">Now playing in this room</string>
 +    <string name="together_no_track">Nothing playing yet</string>
