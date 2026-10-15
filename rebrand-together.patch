@@ -1527,6 +1527,376 @@ index 0000000..4fc3187
 +        )
 +    }
 +}
+diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
+new file mode 100644
+index 0000000..b1496de
+--- /dev/null
++++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
+@@ -0,0 +1,364 @@
++package com.lastwave.app.ui.together
++
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.launch
++import kotlinx.serialization.Serializable
++import kotlinx.serialization.encodeToString
++import kotlinx.serialization.json.Json
++import kotlinx.serialization.json.JsonElement
++import kotlinx.serialization.json.JsonNull
++import kotlinx.serialization.json.JsonObject
++import kotlinx.serialization.json.JsonPrimitive
++import kotlinx.serialization.json.jsonObject
++import kotlinx.serialization.json.jsonPrimitive
++import okhttp3.OkHttpClient
++import okhttp3.Request
++import okhttp3.Response
++import okhttp3.WebSocket
++import okhttp3.WebSocketListener
++import java.util.concurrent.atomic.AtomicInteger
++
++/**
++ * One playback snapshot shared across a Together room.
++ * [updatedAtMs] is the sender's wall clock; receivers add the elapsed time
++ * while the track is playing to compute the expected position (drift correction).
++ */
++@Serializable
++data class TogetherRoomState(
++    val v: Int = 1,
++    val trackVideoId: String? = null,
++    val title: String? = null,
++    val artist: String? = null,
++    val artworkUrl: String? = null,
++    val durationMs: Long = 0L,
++    val positionMs: Long = 0L,
++    val playing: Boolean = false,
++    val updatedAtMs: Long = 0L,
++    val senderId: String = "",
++    val senderName: String = "",
++    val isHost: Boolean = false,
++)
++
++@Serializable
++data class TogetherMember(
++    val id: String = "",
++    val name: String = "",
++    val isHost: Boolean = false,
++)
++
++@Serializable
++data class TogetherPlaylistItem(
++    val videoId: String = "",
++    val title: String = "",
++    val artist: String = "",
++    val artworkUrl: String? = null,
++    val durationMs: Long = 0L,
++    val addedBy: String = "",
++)
++
++/**
++ * The room's shared playlist. Keyed by the room code only — there is no
++ * room name. The list is broadcast whole on every change (lists are small)
++ * and receivers adopt the newest snapshot by [updatedAtMs]. It lives only
++ * while the room is alive: when everyone leaves, it is gone.
++ */
++@Serializable
++data class TogetherPlaylistState(
++    val items: List<TogetherPlaylistItem> = emptyList(),
++    val updatedAtMs: Long = 0L,
++    val senderId: String = "",
++)
++sealed interface TogetherConnection {
++    data object Disconnected : TogetherConnection
++    data object Connecting : TogetherConnection
++    data object Connected : TogetherConnection
++    data class Failed(val message: String) : TogetherConnection
++}
++
++@Serializable
++private data class PhoenixMessage(
++    val topic: String,
++    val event: String,
++    val payload: JsonElement = JsonNull,
++    val ref: String? = null,
++)
++
++@Serializable
++private data class PhoenixJoinConfig(val broadcast: PhoenixBroadcastConfig)
++
++@Serializable
++private data class PhoenixBroadcastConfig(val self: Boolean)
++
++@Serializable
++private data class PhoenixJoinPayload(val config: PhoenixJoinConfig)
++
++@Serializable
++private data class PhoenixBroadcastOut(val event: String, val payload: JsonElement)
++
++/**
++ * Minimal Supabase Realtime client speaking the Phoenix-channels protocol
++ * over an OkHttp WebSocket. No new dependencies: the app already ships
++ * OkHttp + kotlinx-serialization.
++ *
++ * Channel: `realtime:together:<CODE>` — broadcast only, no tables needed.
++ * The room code itself is the access control: codes are 6 chars from a
++ * 31-symbol alphabet generated with SecureRandom (~887M combinations).
++ */
++class TogetherSyncEngine {
++
++    var onConnection: ((TogetherConnection) -> Unit)? = null
++    var onError: ((String) -> Unit)? = null
++    var onRoomState: ((TogetherRoomState) -> Unit)? = null
++    var onMemberHello: ((TogetherMember) -> Unit)? = null
++    var onMemberBye: ((TogetherMember) -> Unit)? = null
++    var onStateRequested: ((TogetherMember) -> Unit)? = null
++    var onPlaylist: ((TogetherPlaylistState) -> Unit)? = null
++
++    private val json = Json { ignoreUnknownKeys = true }
++    private val client = OkHttpClient()
++    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
++    private val refCounter = AtomicInteger(0)
++
++    @Volatile private var socket: WebSocket? = null
++    @Volatile private var topic: String = ""
++    @Volatile private var shouldStayConnected = false
++    @Volatile private var reconnectAttempts = 0
++    @Volatile private var lastUrl: String = ""
++    @Volatile private var lastKey: String = ""
++    @Volatile private var lastRoomCode: String = ""
++    private var heartbeatJob: Job? = null
++    private var reconnectJob: Job? = null
++
++    fun connect(supabaseUrl: String, anonKey: String, roomCode: String) {
++        lastUrl = supabaseUrl
++        lastKey = anonKey
++        lastRoomCode = roomCode
++        reconnectAttempts = 0
++        dial()
++    }
++
++    private fun dial() {
++        // A pending reconnect timer must never fire after we already dialled:
++        // it used to close the healthy socket and loop Connected/Disconnected.
++        reconnectJob?.cancel()
++        disconnectSocketOnly()
++        val host = lastUrl
++            .removePrefix("https://")
++            .removePrefix("http://")
++            .trimEnd('/')
++        topic = "realtime:together:${lastRoomCode.uppercase()}"
++        shouldStayConnected = true
++        onConnection?.invoke(TogetherConnection.Connecting)
++        val request = Request.Builder()
++            .url("wss://$host/realtime/v1/websocket?apikey=$lastKey&vsn=1.0.0")
++            .build()
++        socket = client.newWebSocket(request, listener)
++    }
++
++    fun disconnect() {
++        shouldStayConnected = false
++        reconnectJob?.cancel()
++        heartbeatJob?.cancel()
++        disconnectSocketOnly()
++        onConnection?.invoke(TogetherConnection.Disconnected)
++    }
++
++    /** Manual reconnect: dial again with the stored room params. */
++    fun reconnect() {
++        if (lastUrl.isBlank() || lastRoomCode.isBlank()) return
++        reconnectAttempts = 0
++        reconnectJob?.cancel()
++        dial()
++    }
++
++    fun sendState(state: TogetherRoomState) {
++        sendBroadcast("together_state", json.encodeToString(state))
++    }
++
++    fun sendHello(member: TogetherMember) {
++        sendBroadcast("together_hello", json.encodeToString(member))
++    }
++
++    fun sendBye(member: TogetherMember) {
++        sendBroadcast("together_bye", json.encodeToString(member))
++    }
++
++    fun sendStateRequest(member: TogetherMember) {
++        sendBroadcast("together_request", json.encodeToString(member))
++    }
++
++    fun sendPlaylist(state: TogetherPlaylistState) {
++        sendBroadcast("together_playlist", json.encodeToString(state))
++    }
++
++    private fun sendBroadcast(event: String, payloadJson: String) {
++        val ws = socket ?: return
++        if (topic.isBlank()) return
++        val payload = json.parseToJsonElement(payloadJson)
++        val msg = PhoenixMessage(
++            topic = topic,
++            event = "broadcast",
++            payload = JsonObject(
++                mapOf(
++                    "event" to JsonPrimitive(event),
++                    "payload" to payload,
++                )
++            ),
++            ref = nextRef(),
++        )
++        ws.send(json.encodeToString(msg))
++    }
++
++    private fun nextRef(): String = refCounter.incrementAndGet().toString()
++
++    private fun disconnectSocketOnly() {
++        heartbeatJob?.cancel()
++        try { socket?.close(1000, "leave") } catch (_: Exception) { }
++        socket = null
++    }
++
++    private fun startHeartbeat() {
++        heartbeatJob?.cancel()
++        heartbeatJob = scope.launch {
++            while (true) {
++                delay(25_000)
++                val ws = socket ?: break
++                val msg = PhoenixMessage(
++                    topic = "phoenix",
++                    event = "heartbeat",
++                    payload = JsonObject(emptyMap()),
++                    ref = nextRef(),
++                )
++                ws.send(json.encodeToString(msg))
++            }
++        }
++    }
++
++    private fun scheduleReconnect() {
++        if (!shouldStayConnected) return
++        // Keep retrying on flaky mobile networks: never give up and strand
++        // the room on Disconnected. Backoff caps at 30s; a dial is cheap.
++        val attempt = reconnectAttempts++
++        val delayMs = minOf(2_000L shl minOf(attempt, 4), 30_000L)
++        reconnectJob?.cancel()
++        reconnectJob = scope.launch {
++            delay(delayMs)
++            if (shouldStayConnected) dial()
++        }
++    }
++
++    private val listener = object : WebSocketListener() {
++        override fun onOpen(webSocket: WebSocket, response: Response) {
++            val join = PhoenixMessage(
++                topic = topic,
++                event = "phx_join",
++                payload = JsonObject(
++                    mapOf(
++                        "config" to JsonObject(
++                            mapOf(
++                                "broadcast" to JsonObject(
++                                    mapOf(
++                                        "self" to JsonPrimitive(false),
++                                        "ack" to JsonPrimitive(false),
++                                    )
++                                ),
++                                "presence" to JsonObject(
++                                    mapOf("key" to JsonPrimitive(""))
++                                ),
++                                "private" to JsonPrimitive(false),
++                            )
++                        )
++                    )
++                ),
++                ref = nextRef(),
++            )
++            webSocket.send(json.encodeToString(join))
++            startHeartbeat()
++        }
++
++        override fun onMessage(webSocket: WebSocket, text: String) {
++            // Ignore events from a stale socket: after a reconnect the old
++            // socket can still deliver/close late, and acting on it used to
++            // tear down the healthy connection.
++            if (webSocket !== socket) return
++            val parsed = runCatching { json.decodeFromString<PhoenixMessage>(text) }.getOrNull() ?: return
++            when (parsed.event) {
++                "phx_reply" -> {
++                    val payloadObj = parsed.payload as? JsonObject
++                    val status = payloadObj
++                        ?.get("status")?.jsonPrimitive?.content
++                    if (status == "ok") {
++                        reconnectAttempts = 0
++                        reconnectJob?.cancel()
++                        onConnection?.invoke(TogetherConnection.Connected)
++                    } else {
++                        val response = payloadObj?.get("response")?.toString() ?: ""
++                        onError?.invoke("Join rejected by server $response")
++                        onConnection?.invoke(
++                            TogetherConnection.Failed("Could not join room")
++                        )
++                    }
++                }
++                "broadcast" -> {
++                    val inner = parsed.payload as? JsonObject ?: return
++                    val event = inner["event"]?.jsonPrimitive?.content ?: return
++                    val payload = inner["payload"] ?: return
++                    when (event) {
++                        "together_state" -> runCatching {
++                            onRoomState?.invoke(json.decodeFromJsonElement(TogetherRoomState.serializer(), payload))
++                        }
++                        "together_hello" -> runCatching {
++                            onMemberHello?.invoke(json.decodeFromJsonElement(TogetherMember.serializer(), payload))
++                        }
++                        "together_bye" -> runCatching {
++                            onMemberBye?.invoke(json.decodeFromJsonElement(TogetherMember.serializer(), payload))
++                        }
++                        "together_request" -> runCatching {
++                            onStateRequested?.invoke(json.decodeFromJsonElement(TogetherMember.serializer(), payload))
++                        }
++                        "together_playlist" -> runCatching {
++                            onPlaylist?.invoke(json.decodeFromJsonElement(TogetherPlaylistState.serializer(), payload))
++                        }
++                    }
++                }
++                "phx_close", "phx_error" -> {
++                    onError?.invoke("Channel closed by server")
++                    onConnection?.invoke(TogetherConnection.Disconnected)
++                    scheduleReconnect()
++                }
++            }
++        }
++
++        override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
++            if (webSocket !== socket) return
++            heartbeatJob?.cancel()
++            if (shouldStayConnected) {
++                onConnection?.invoke(TogetherConnection.Disconnected)
++                scheduleReconnect()
++            }
++        }
++
++        override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
++            if (webSocket !== socket) return
++            heartbeatJob?.cancel()
++            onError?.invoke(t.message ?: "Connection failed")
++            if (shouldStayConnected) {
++                onConnection?.invoke(TogetherConnection.Disconnected)
++                scheduleReconnect()
++            }
++        }
++    }
++
++    fun release() {
++        shouldStayConnected = false
++        reconnectJob?.cancel()
++        heartbeatJob?.cancel()
++        disconnectSocketOnly()
++        scope.cancel()
++    }
++}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
 new file mode 100644
 index 0000000..d236b3f
