@@ -1561,10 +1561,10 @@ index 0000000..5021ebe
 +    }
 +}
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index ef8ddcb..4b1e34f 100644
+index ef8ddcb..a29c2ae 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
-@@ -328,4 +328,47 @@
+@@ -328,4 +328,48 @@
      <string name="settings_search_no_results_sub">Try checking for typos or searching with different keywords</string>
      <string name="settings_search_clear">Clear search</string>
      <string name="settings_search_title">Search settings</string>
@@ -1583,6 +1583,7 @@ index ef8ddcb..4b1e34f 100644
 +    <string name="together_username_hint">What should others call you?</string>
 +    <string name="together_create_title">Start a new room</string>
 +    <string name="together_create_desc">Create a room and share the 6-digit code with your friend.</string>
++    <string name="together_create_room">Create room</string>
 +    <string name="together_join_title">Join a room</string>
 +    <string name="together_join_desc">Enter the code shared by your friend.</string>
 +    <string name="together_join_room">Join room</string>
