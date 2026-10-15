@@ -1,5 +1,5 @@
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 655dc41..f58a2dc 100644
+index 655dc41..c4baeaa 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -60,14 +60,21 @@ android {
@@ -8,8 +8,8 @@ index 655dc41..f58a2dc 100644
          targetSdk = 35
 -        versionCode = 27
 -        versionName = "4.2.7"
-+        versionCode = 31
-+        versionName = "4.2.11"
++        versionCode = 32
++        versionName = "4.2.12"
  
          val lastWaveLyricsToken = resolveSecret("LASTWAVE_LYRICS_TOKEN")
          val lastWaveLyricsUrl = resolveSecret("LASTWAVE_LYRICS_URL")
@@ -62,10 +62,10 @@ index 33b6163..9a36be9 100644
  }
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
 new file mode 100644
-index 0000000..4796a87
+index 0000000..72e5682
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
-@@ -0,0 +1,534 @@
+@@ -0,0 +1,566 @@
 +package com.lastwave.app.ui.together
 +
 +import androidx.compose.foundation.background
@@ -84,6 +84,7 @@ index 0000000..4796a87
 +import androidx.compose.foundation.rememberScrollState
 +import androidx.compose.foundation.shape.CircleShape
 +import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.foundation.text.KeyboardOptions
 +import androidx.compose.foundation.verticalScroll
 +import androidx.compose.material.icons.Icons
 +import androidx.compose.material.icons.filled.Close
@@ -113,6 +114,7 @@ index 0000000..4796a87
 +import androidx.compose.ui.res.stringResource
 +import androidx.compose.ui.text.AnnotatedString
 +import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.input.KeyboardType
 +import androidx.compose.ui.text.style.TextAlign
 +import androidx.compose.ui.unit.dp
 +import androidx.hilt.navigation.compose.hiltViewModel
@@ -472,36 +474,39 @@ index 0000000..4796a87
 +                    }
 +                }
 +
-+                // ---- create / join ----
++                // ---- create / join: two separate actions, no shared form ----
 +                if (!state.inRoom) {
++                    OutlinedTextField(
++                        value = state.username,
++                        onValueChange = viewModel::onUsernameChange,
++                        label = { Text(stringResource(R.string.together_username_label)) },
++                        placeholder = { Text(stringResource(R.string.together_username_hint)) },
++                        singleLine = true,
++                        modifier = Modifier.fillMaxWidth(),
++                    )
++                    state.error?.let {
++                        Text(
++                            text = it,
++                            style = MaterialTheme.typography.bodyMedium,
++                            color = MaterialTheme.colorScheme.error,
++                        )
++                    }
++
 +                    Card(modifier = Modifier.fillMaxWidth()) {
 +                        Column(
 +                            Modifier.padding(16.dp),
 +                            verticalArrangement = Arrangement.spacedBy(12.dp),
 +                        ) {
-+                            OutlinedTextField(
-+                                value = state.username,
-+                                onValueChange = viewModel::onUsernameChange,
-+                                label = { Text(stringResource(R.string.together_username_label)) },
-+                                placeholder = { Text(stringResource(R.string.together_username_hint)) },
-+                                singleLine = true,
-+                                modifier = Modifier.fillMaxWidth(),
++                            Text(
++                                text = stringResource(R.string.together_create_title),
++                                style = MaterialTheme.typography.titleMedium,
++                                fontWeight = FontWeight.Bold,
 +                            )
-+                            OutlinedTextField(
-+                                value = state.roomCodeInput,
-+                                onValueChange = viewModel::onRoomCodeInputChange,
-+                                label = { Text(stringResource(R.string.together_room_code_label)) },
-+                                placeholder = { Text(stringResource(R.string.together_room_code_hint)) },
-+                                singleLine = true,
-+                                modifier = Modifier.fillMaxWidth(),
++                            Text(
++                                text = stringResource(R.string.together_create_desc),
++                                style = MaterialTheme.typography.bodyMedium,
++                                color = MaterialTheme.colorScheme.onSurfaceVariant,
 +                            )
-+                            state.error?.let {
-+                                Text(
-+                                    text = it,
-+                                    style = MaterialTheme.typography.bodyMedium,
-+                                    color = MaterialTheme.colorScheme.error,
-+                                )
-+                            }
 +                            Button(
 +                                onClick = { viewModel.createRoom() },
 +                                enabled = state.configured,
@@ -509,6 +514,33 @@ index 0000000..4796a87
 +                            ) {
 +                                Text(stringResource(R.string.together_create_room))
 +                            }
++                        }
++                    }
++
++                    Card(modifier = Modifier.fillMaxWidth()) {
++                        Column(
++                            Modifier.padding(16.dp),
++                            verticalArrangement = Arrangement.spacedBy(12.dp),
++                        ) {
++                            Text(
++                                text = stringResource(R.string.together_join_title),
++                                style = MaterialTheme.typography.titleMedium,
++                                fontWeight = FontWeight.Bold,
++                            )
++                            Text(
++                                text = stringResource(R.string.together_join_desc),
++                                style = MaterialTheme.typography.bodyMedium,
++                                color = MaterialTheme.colorScheme.onSurfaceVariant,
++                            )
++                            OutlinedTextField(
++                                value = state.roomCodeInput,
++                                onValueChange = viewModel::onRoomCodeInputChange,
++                                label = { Text(stringResource(R.string.together_room_code_label)) },
++                                placeholder = { Text(stringResource(R.string.together_room_code_hint)) },
++                                singleLine = true,
++                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
++                                modifier = Modifier.fillMaxWidth(),
++                            )
 +                            OutlinedButton(
 +                                onClick = { viewModel.joinRoom() },
 +                                enabled = state.configured,
@@ -972,10 +1004,10 @@ index 0000000..b1496de
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
 new file mode 100644
-index 0000000..ef6831e
+index 0000000..5021ebe
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
-@@ -0,0 +1,494 @@
+@@ -0,0 +1,552 @@
 +package com.lastwave.app.ui.together
 +
 +import android.content.Context
@@ -987,6 +1019,8 @@ index 0000000..ef6831e
 +import dagger.hilt.android.lifecycle.HiltViewModel
 +import dagger.hilt.android.qualifiers.ApplicationContext
 +import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.delay
 +import kotlinx.coroutines.flow.MutableStateFlow
 +import kotlinx.coroutines.flow.StateFlow
 +import kotlinx.coroutines.flow.asStateFlow
@@ -1021,6 +1055,16 @@ index 0000000..ef6831e
 +/** Drift above this is corrected with a seek (keeps both players aligned). */
 +private const val DRIFT_TOLERANCE_MS = 600L
 +
++/** Pause confirm window: a pause must still hold after this long before it
++ *  is sent to the room. Buffering stalls recover inside the window, so a
++ *  stall is never mistaken for a real pause. */
++private const val PAUSE_CONFIRM_DELAY_MS = 1_200L
++
++/** The only connection problem text the UI ever shows: no hostnames, no
++ *  URLs, no technical detail. */
++private const val FRIENDLY_CONNECTION_ISSUE =
++    "Connection issue. Check your internet and tap Reconnect."
++
 +/**
 + * Owns the Together room: creating/joining, broadcasting each member's
 + * playback, applying remote state, drift correction and reconnects.
@@ -1054,9 +1098,10 @@ index 0000000..ef6831e
 +    )
 +    val uiState: StateFlow<TogetherUiState> = _uiState.asStateFlow()
 +
-+    private var pendingSeekMs: Long? = null
-+    private var pendingVideoId: String? = null
++    private var pendingRoomState: TogetherRoomState? = null
++    private var pendingReceivedAtMs: Long = 0L
 +    private var pendingSeekSetAtMs: Long = 0L
++    private var pendingPauseJob: Job? = null
 +    private var lastAppliedState: TogetherRoomState? = null
 +    private var lastBroadcastState: TogetherRoomState? = null
 +    private var playlistUpdatedAtMs: Long = 0L
@@ -1082,7 +1127,9 @@ index 0000000..ef6831e
 +            }
 +        }
 +        engine.onError = { message ->
-+            _uiState.update { it.copy(lastError = message) }
++            // Never surface raw engine text: it can contain backend
++            // hostnames/URLs and technical detail the user must not see.
++            _uiState.update { it.copy(lastError = FRIENDLY_CONNECTION_ISSUE) }
 +        }
 +        engine.onRoomState = { roomState -> onRoomStateReceived(roomState) }
 +        engine.onMemberHello = { member ->
@@ -1090,6 +1137,10 @@ index 0000000..ef6831e
 +                val without = state.members.filterNot { it.id == member.id }
 +                state.copy(members = (without + member).sortedBy { !it.isHost })
 +            }
++            // A newcomer (or a reconnected member) gets the current room
++            // playlist so late joiners are not stuck with an empty list.
++            val state = _uiState.value
++            if (state.inRoom && state.roomPlaylist.isNotEmpty()) broadcastPlaylist()
 +        }
 +        engine.onMemberBye = { member ->
 +            // Any member may leave; the room keeps working for everyone else.
@@ -1113,7 +1164,7 @@ index 0000000..ef6831e
 +    fun onRoomCodeInputChange(value: String) {
 +        _uiState.update {
 +            it.copy(
-+                roomCodeInput = value.uppercase().filter { ch -> ch.isLetterOrDigit() }.take(6),
++                roomCodeInput = value.filter { ch -> ch.isDigit() }.take(6),
 +                error = null,
 +            )
 +        }
@@ -1160,9 +1211,9 @@ index 0000000..ef6831e
 +            _uiState.update { it.copy(error = "Together is not set up yet on this build.") }
 +            return
 +        }
-+        val code = _uiState.value.roomCodeInput.trim().uppercase()
-+        if (code.length != 6 || !code.all { it.isLetterOrDigit() }) {
-+            _uiState.update { it.copy(error = "Enter the 6-character room code.") }
++        val code = _uiState.value.roomCodeInput.trim()
++        if (code.length != 6 || !code.all { it.isDigit() }) {
++            _uiState.update { it.copy(error = "Enter the 6-digit room code.") }
 +            return
 +        }
 +        saveUsername(username)
@@ -1199,6 +1250,9 @@ index 0000000..ef6831e
 +        }
 +        playlistUpdatedAtMs = 0L
 +        suppressBroadcastUntilMs = 0L
++        pendingPauseJob?.cancel()
++        pendingPauseJob = null
++        pendingRoomState = null
 +    }
 +
 +    /** Room playlist: shared queue keyed by the room code only (no room
@@ -1260,10 +1314,17 @@ index 0000000..ef6831e
 +        val now = System.currentTimeMillis()
 +        playlistUpdatedAtMs = now
 +        _uiState.update { it.copy(roomPlaylist = items, error = error) }
++        broadcastPlaylist()
++    }
++
++    /** Re-send the current playlist without changing its timestamp. */
++    private fun broadcastPlaylist() {
++        val state = _uiState.value
++        if (!state.inRoom) return
 +        engine.sendPlaylist(
 +            TogetherPlaylistState(
-+                items = items,
-+                updatedAtMs = now,
++                items = state.roomPlaylist,
++                updatedAtMs = playlistUpdatedAtMs,
 +                senderId = selfId,
 +            )
 +        )
@@ -1302,7 +1363,8 @@ index 0000000..ef6831e
 +    }
 +
 +    private fun generateRoomCode(): String {
-+        val alphabet = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"
++        // Digits only, so the code is easy to read out and type.
++        val alphabet = "0123456789"
 +        val random = SecureRandom()
 +        return buildString {
 +            repeat(6) { append(alphabet[random.nextInt(alphabet.length)]) }
@@ -1317,36 +1379,56 @@ index 0000000..ef6831e
 +        viewModelScope.launch {
 +            musicPlayer.state.collect { player ->
 +                val state = _uiState.value
-+                // Apply a pending seek once the room track is loaded.
-+                if (pendingSeekMs != null) {
-+                    val target = pendingVideoId
-+                    if (target != null && player.current?.videoId == target) {
-+                        val seekTo = pendingSeekMs
-+                        if (seekTo != null) {
-+                            // Hold broadcasts until the catch-up seek lands,
-+                            // otherwise this device broadcasts "position ~0"
-+                            // and drags the other device back to the start.
-+                            suppressBroadcastUntilMs = System.currentTimeMillis() + 2_000
-+                            viewModelScope.launch(Dispatchers.Main) {
-+                                musicPlayer.seekTo(seekTo)
-+                                pendingSeekMs = null
-+                                pendingVideoId = null
-+                            }
-+                        } else {
-+                            pendingSeekMs = null
-+                            pendingVideoId = null
++                // Apply a pending seek once the room track is loaded. The
++                // seek target is computed at apply time from the moment
++                // the state arrived, so a slow stream resolve does not
++                // leave the seek seconds behind.
++                val pending = pendingRoomState
++                if (pending != null) {
++                    if (player.current?.videoId == pending.trackVideoId) {
++                        val seekTo = expectedPosition(pending, pendingReceivedAtMs)
++                        // Hold broadcasts until the catch-up seek lands,
++                        // otherwise this device broadcasts "position ~0"
++                        // and drags the other device back to the start.
++                        suppressBroadcastUntilMs = System.currentTimeMillis() + 2_000
++                        viewModelScope.launch(Dispatchers.Main) {
++                            musicPlayer.seekTo(seekTo)
++                            pendingRoomState = null
 +                        }
 +                    } else if (System.currentTimeMillis() - pendingSeekSetAtMs > 10_000) {
-+                        pendingSeekMs = null
-+                        pendingVideoId = null
++                        pendingRoomState = null
 +                    }
 +                }
 +                if (!state.inRoom) return@collect
 +                val videoId = player.current?.videoId
-+                if (videoId != lastBroadcastVideoId || player.isPlaying != lastBroadcastPlaying) {
++                if (videoId != lastBroadcastVideoId) {
++                    pendingPauseJob?.cancel()
 +                    lastBroadcastVideoId = videoId
 +                    lastBroadcastPlaying = player.isPlaying
 +                    broadcastCurrentState(playerPositionMs = player.positionMs)
++                } else if (player.isPlaying != lastBroadcastPlaying) {
++                    if (player.isPlaying) {
++                        // Resumed: cancel any pending pause, sync at once.
++                        pendingPauseJob?.cancel()
++                        lastBroadcastPlaying = true
++                        broadcastCurrentState(playerPositionMs = player.positionMs)
++                    } else {
++                        // Paused — but not confirmed yet. Media3 reports
++                        // isPlaying=false while the player is merely
++                        // buffering (network stall). Broadcasting that
++                        // would pause the other device for no reason, so
++                        // wait: only a pause that still holds after the
++                        // window, and is not buffering, reaches the room.
++                        lastBroadcastPlaying = false
++                        pendingPauseJob?.cancel()
++                        pendingPauseJob = viewModelScope.launch {
++                            delay(PAUSE_CONFIRM_DELAY_MS)
++                            val current = musicPlayer.state.value
++                            if (!current.isPlaying && !current.isBuffering) {
++                                broadcastCurrentState()
++                            }
++                        }
++                    }
 +                } else {
 +                    // Seek detection: position jumped far beyond natural progress.
 +                    val now = System.currentTimeMillis()
@@ -1385,7 +1467,7 @@ index 0000000..ef6831e
 +        // still-catching-up seek all stay local until they are real.
 +        if (!state.autoSync) return
 +        if (System.currentTimeMillis() < suppressBroadcastUntilMs) return
-+        if (pendingSeekMs != null) return
++        if (pendingRoomState != null) return
 +        val player = musicPlayer.state.value
 +        if (player.error != null) return
 +        val roomState = TogetherRoomState(
@@ -1420,6 +1502,10 @@ index 0000000..ef6831e
 +
 +    /** Joiner: apply the host's snapshot to the shared player. */
 +    private fun onRoomStateReceived(roomState: TogetherRoomState) {
++        // The moment this state arrived, on THIS device's clock. Position
++        // math uses it — never the sender's clock, so phones whose clocks
++        // disagree by seconds still land on the same timeline.
++        val receivedAtMs = System.currentTimeMillis()
 +        if (roomState.senderId == selfId) return
 +        _uiState.update { it.copy(roomTrack = roomState) }
 +        val state = _uiState.value
@@ -1427,6 +1513,9 @@ index 0000000..ef6831e
 +        // Echo suppression: this is our own state bounced back through
 +        // the other device after it applied it.
 +        if (statesMatch(roomState, lastBroadcastState)) return
++        // Dedupe: this exact moment was already applied (duplicate
++        // delivery, or two members answering one state request).
++        if (statesMatch(roomState, lastAppliedState)) return
 +        if (!state.autoSync) return
 +        lastAppliedState = roomState
 +        val videoId = roomState.trackVideoId ?: return
@@ -1440,14 +1529,14 @@ index 0000000..ef6831e
 +                    videoId = videoId,
 +                    durationMs = roomState.durationMs.takeIf { it > 0 },
 +                )
-+                pendingVideoId = videoId
-+                pendingSeekMs = expectedPosition(roomState)
++                pendingRoomState = roomState
++                pendingReceivedAtMs = receivedAtMs
 +                pendingSeekSetAtMs = System.currentTimeMillis()
 +                suppressBroadcastUntilMs = System.currentTimeMillis() + 2_000
 +                musicPlayer.play(track, sourceLabel = "Together", startRadio = false)
 +                if (roomState.playing) musicPlayer.resume() else musicPlayer.pause()
 +            } else {
-+                val expected = expectedPosition(roomState)
++                val expected = expectedPosition(roomState, receivedAtMs)
 +                if (kotlin.math.abs(local.positionMs - expected) > DRIFT_TOLERANCE_MS) {
 +                    musicPlayer.seekTo(expected)
 +                }
@@ -1458,23 +1547,24 @@ index 0000000..ef6831e
 +        }
 +    }
 +
-+    private fun expectedPosition(roomState: TogetherRoomState): Long {
++    private fun expectedPosition(roomState: TogetherRoomState, receivedAtMs: Long): Long {
 +        if (!roomState.playing) return roomState.positionMs
-+        val elapsed = System.currentTimeMillis() - roomState.updatedAtMs
++        val elapsed = System.currentTimeMillis() - receivedAtMs
 +        return (roomState.positionMs + elapsed).coerceAtLeast(0L)
 +    }
 +
 +    override fun onCleared() {
 +        super.onCleared()
++        pendingPauseJob?.cancel()
 +        engine.disconnect()
 +        engine.release()
 +    }
 +}
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index ef8ddcb..dfecd54 100644
+index ef8ddcb..4b1e34f 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
-@@ -328,4 +328,44 @@
+@@ -328,4 +328,47 @@
      <string name="settings_search_no_results_sub">Try checking for typos or searching with different keywords</string>
      <string name="settings_search_clear">Clear search</string>
      <string name="settings_search_title">Search settings</string>
@@ -1488,10 +1578,13 @@ index ef8ddcb..dfecd54 100644
 +    <string name="together_status_disconnected">Disconnected</string>
 +    <string name="together_status_failed">Connection failed</string>
 +    <string name="together_room_code_label">Room code</string>
-+    <string name="together_room_code_hint">6-character code</string>
++    <string name="together_room_code_hint">Enter the 6-digit code</string>
 +    <string name="together_username_label">Your name</string>
 +    <string name="together_username_hint">What should others call you?</string>
-+    <string name="together_create_room">Create room</string>
++    <string name="together_create_title">Start a new room</string>
++    <string name="together_create_desc">Create a room and share the 6-digit code with your friend.</string>
++    <string name="together_join_title">Join a room</string>
++    <string name="together_join_desc">Enter the code shared by your friend.</string>
 +    <string name="together_join_room">Join room</string>
 +    <string name="together_leave_room">Leave room</string>
 +    <string name="together_reconnect">Reconnect</string>
@@ -1511,11 +1604,11 @@ index ef8ddcb..dfecd54 100644
 +    <string name="together_autosync_title">Auto-sync playback</string>
 +    <string name="together_autosync_desc">When off, you only watch the room — your player is not controlled.</string>
 +    <string name="together_how_title">How it works</string>
-+    <string name="together_how_1">1. One person creates a room and shares the 6-letter code.</string>
-+    <string name="together_how_2">2. The other person enters the code and joins.</string>
-+    <string name="together_how_3">3. The host plays, pauses, seeks or changes tracks — everyone hears the same moment.</string>
++    <string name="together_how_1">1. One person taps Create room and shares the 6-digit code.</string>
++    <string name="together_how_2">2. The other person enters the code and taps Join room.</string>
++    <string name="together_how_3">3. Play, pause, seek or change the song on either phone. Both stay in sync.</string>
 +    <string name="together_host_left">The host left the room.</string>
 +    <string name="together_error_username">Please enter a name (2–20 characters).</string>
-+    <string name="together_error_code">Enter the 6-character room code.</string>
++    <string name="together_error_code">Enter the 6-digit room code.</string>
 +    <string name="together_error_not_configured">Together is not set up yet on this build.</string>
  </resources>
