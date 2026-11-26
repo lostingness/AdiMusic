@@ -184,7 +184,7 @@ index 945fdbd8..d0a1ee59 100644
 -
 -[![GitGem](https://gitgem.org/api/badge/github/Clash-Projects/LastWave-Native.svg)](https://gitgem.org/github/Clash-Projects/LastWave-Native)
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 655dc416..4f91a130 100644
+index 655dc416..6847c8db 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -60,14 +60,21 @@ android {
@@ -193,8 +193,8 @@ index 655dc416..4f91a130 100644
          targetSdk = 35
 -        versionCode = 27
 -        versionName = "4.2.7"
-+        versionCode = 39
-+        versionName = "4.2.19"
++        versionCode = 40
++        versionName = "4.2.20"
  
          val lastWaveLyricsToken = resolveSecret("LASTWAVE_LYRICS_TOKEN")
          val lastWaveLyricsUrl = resolveSecret("LASTWAVE_LYRICS_URL")
@@ -832,7 +832,7 @@ index c40de2d2..c1d4d99b 100644
                                  color = MaterialTheme.colorScheme.onSurfaceVariant,
                              )
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
-index 0f03515e..d94ae578 100644
+index 0f03515e..e9495c09 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
 @@ -32,9 +32,11 @@ import androidx.compose.ui.text.AnnotatedString
@@ -1423,7 +1423,7 @@ index 0f03515e..d94ae578 100644
              )
 -            Spacer(Modifier.height(4.dp))
 -            val portfolioUri = remember { Uri.parse("https://iamadityajha.vercel.app") }
-+            Spacer(Modifier.height(6.dp))
++            Spacer(Modifier.height(32.dp))
              Text(
 -                "iamadityajha.vercel.app",
 -                style = MaterialTheme.typography.bodySmall.copy(textDecoration = TextDecoration.Underline),
