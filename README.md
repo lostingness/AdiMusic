@@ -1,13 +1,13 @@
-# AdiMusic
+# ADJ
 
 Android music player — rebranded from [LastWave-Native](https://github.com/Clash-Projects/LastWave-Native) by Clash-Projects.
 
-**Rebranded by Aditya Jha** · App name: AdiMusic
+**Rebranded by Aditya Jha** · App name: ADJ
 
 ## About
 
-AdiMusic is a fork of LastWave-Native (v4.2.4) with the app name, widgets, and
-about-screen rebranded to AdiMusic. The package name (`com.lastwave.app`) is
+ADJ is a fork of LastWave-Native (v4.2.4) with the app name, widgets, and
+about-screen rebranded to ADJ. The package name (`com.lastwave.app`) is
 intentionally unchanged to keep the build and native bindings working.
 
 Original project, authorship, and license belong to Clash-Projects.
@@ -17,7 +17,7 @@ This fork is distributed under the same **GPL-3.0** license — see `LICENSE`.
 
 Every push to `main` builds a debug APK with GitHub Actions
 (`.github/workflows/build-apk.yml`) and publishes it under
-**Releases** as `AdiMusic-v4.2.4.apk`.
+**Releases** as `ADJ-v4.2.4.apk`.
 
 To install on your phone: download the APK from Releases and allow
 "Install unknown apps" when Android asks.

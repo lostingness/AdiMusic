@@ -1,5 +1,5 @@
 diff --git a/README.md b/README.md
-index 945fdbd..d0a1ee5 100644
+index 945fdbd8..d0a1ee59 100644
 --- a/README.md
 +++ b/README.md
 @@ -1,160 +1,32 @@
@@ -184,7 +184,7 @@ index 945fdbd..d0a1ee5 100644
 -
 -[![GitGem](https://gitgem.org/api/badge/github/Clash-Projects/LastWave-Native.svg)](https://gitgem.org/github/Clash-Projects/LastWave-Native)
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 655dc41..29aea75 100644
+index 655dc416..faf3a670 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -60,14 +60,21 @@ android {
@@ -193,8 +193,8 @@ index 655dc41..29aea75 100644
          targetSdk = 35
 -        versionCode = 27
 -        versionName = "4.2.7"
-+        versionCode = 35
-+        versionName = "4.2.15"
++        versionCode = 36
++        versionName = "4.2.16"
  
          val lastWaveLyricsToken = resolveSecret("LASTWAVE_LYRICS_TOKEN")
          val lastWaveLyricsUrl = resolveSecret("LASTWAVE_LYRICS_URL")
@@ -211,9 +211,240 @@ index 655dc41..29aea75 100644
          // Native secrets (addon client lock) live strictly in native .so via
          // SecretsBridge_generated.h (tools/generate_native_secrets.py).
          // No secret fields are exposed in DEX / BuildConfig.
+@@ -187,6 +194,7 @@ android {
+ 
+ dependencies {
+     implementation("com.google.android.gms:play-services-cast-framework:22.3.1")
++    implementation("com.google.zxing:core:3.5.3")
+     implementation("org.nanohttpd:nanohttpd:2.3.1")
+     implementation(libs.androidx.core.ktx)
+     implementation(libs.androidx.lifecycle.runtime.ktx)
+diff --git a/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt b/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
+index e69c2e47..38dfc7fa 100644
+--- a/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
++++ b/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
+@@ -56,7 +56,7 @@ enum class LyricsAnimation(val id: String, val title: String, val description: S
+  *  proper nouns — no localization needed. */
+ enum class LyricsProvider(val id: String, val title: String, val subtitle: String) {
+     AUTO("auto", "Auto", "Fastest word-sync wins, LRCLIB fallback"),
+-    LASTWAVE("lastwave", "AdiMusic", "Syllable & line-synced Apple lyrics first"),
++    LASTWAVE("lastwave", "ADJ", "Syllable & line-synced Apple lyrics first"),
+     APPLE_MUSIC("apple_music", "Apple Music", "Syllable-synced Apple Music lyrics first"),
+     BETTER_LYRICS("better_lyrics", "BetterLyrics", "Word-synced lyrics first"),
+     KUGOU("kugou", "Kugou", "KRC word-synced lyrics first"),
+diff --git a/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt b/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt
+index bcbddd5b..96fb325c 100644
+--- a/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt
++++ b/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt
+@@ -149,7 +149,7 @@ class LastWaveLyricsApi @Inject constructor(
+                     isWordSynced = hasWordTiming,
+                     plainLyrics = ttmlLines.joinToString("\n") { it.text },
+                     isInstrumental = false,
+-                    source = if (hasWordTiming) "AdiMusic (Word-Sync)" else "AdiMusic (Line-Sync)",
++                    source = if (hasWordTiming) "ADJ (Word-Sync)" else "ADJ (Line-Sync)",
+                 )
+             }
+         }
+@@ -172,7 +172,7 @@ class LastWaveLyricsApi @Inject constructor(
+                 isWordSynced = false,
+                 plainLyrics = lrcLines.joinToString("\n") { it.text },
+                 isInstrumental = false,
+-                source = "AdiMusic (Line-Sync)",
++                source = "ADJ (Line-Sync)",
+             )
+         }
+ 
+@@ -184,7 +184,7 @@ class LastWaveLyricsApi @Inject constructor(
+                 isWordSynced = false,
+                 plainLyrics = content.trim(),
+                 isInstrumental = false,
+-                source = "AdiMusic (Plain)",
++                source = "ADJ (Plain)",
+             )
+         }
+ 
+diff --git a/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt b/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt
+index 07ab7b82..dbe1731a 100644
+--- a/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt
++++ b/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt
+@@ -1127,7 +1127,7 @@ class InnerTubeMusicApi @Inject constructor(
+     suspend fun createRemotePlaylist(title: String): String? = withContext(Dispatchers.IO) {
+         if (!ytAuth.connection.value.isConnected) return@withContext null
+         val cleanTitle = title.replace("<", "(").replace(">", ")").take(150)
+-            .ifBlank { "AdiMusic Playlist" }
++            .ifBlank { "ADJ Playlist" }
+         val config = getWebConfig()
+         val root = runCatching {
+             post(
+diff --git a/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt b/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt
+index 6b1c2bb0..890d6c7f 100644
+--- a/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt
++++ b/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt
+@@ -386,7 +386,7 @@ class PlaylistRepository @Inject constructor(
+             if (entity != null) {
+                 val adopted = entity.copy(
+                     title = LIKED_SONGS_TITLE,
+-                    subtitle = "Songs you like in AdiMusic",
++                    subtitle = "Songs you like in ADJ",
+                     mode = LIKED_SONGS_MODE,
+                     isPinned = true,
+                 )
+@@ -398,7 +398,7 @@ class PlaylistRepository @Inject constructor(
+         }
+         val created = save(
+             title = LIKED_SONGS_TITLE,
+-            subtitle = "Songs you like in AdiMusic",
++            subtitle = "Songs you like in ADJ",
+             mode = LIKED_SONGS_MODE,
+             tracks = emptyList(),
+         )
+diff --git a/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt b/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt
+index 748c1c38..01ba74e4 100644
+--- a/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt
++++ b/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt
+@@ -57,9 +57,9 @@ class AppUpdateManager @Inject constructor(
+     }
+ 
+     fun checkForUpdate(isSilent: Boolean = false) {
+-        // AdiMusic rebrand: update checks against the original LastWave repo are
++        // ADJ rebrand: update checks against the original LastWave repo are
+         // disabled — pointing users at another project's releases would be wrong.
+-        // Point this at your own releases feed if you publish AdiMusic builds.
++        // Point this at your own releases feed if you publish ADJ builds.
+         scope.launch {
+             _updateInfo.update {
+                 it.copy(
+@@ -77,7 +77,7 @@ class AppUpdateManager @Inject constructor(
+     }
+ 
+     fun openUpdate(context: Context) {
+-        // AdiMusic rebrand: updates are disabled in this build, so there is
++        // ADJ rebrand: updates are disabled in this build, so there is
+         // nothing to open. (Previously fell back to the original repo releases.)
+         return
+     }
+diff --git a/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt b/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt
+index 45ca44ff..1755938e 100644
+--- a/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt
++++ b/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt
+@@ -134,7 +134,7 @@ internal data class PersistedPlaybackSession(
+     val queue: List<PlayableTrack>,
+     val currentIndex: Int,
+     val positionMs: Long,
+-    val sourceLabel: String = "AdiMusic",
++    val sourceLabel: String = "ADJ",
+     val isEndlessQueue: Boolean = false,
+     val shuffleEnabled: Boolean = false,
+     val repeatMode: Int = Player.REPEAT_MODE_OFF,
+@@ -147,7 +147,7 @@ data class MusicPlayerState(
+     val current: PlayableTrack? = null,
+     val queue: List<PlayableTrack> = emptyList(),
+     val currentIndex: Int = -1,
+-    val sourceLabel: String = "AdiMusic",
++    val sourceLabel: String = "ADJ",
+     val isEndlessQueue: Boolean = false,
+     val isPlaying: Boolean = false,
+     val isBuffering: Boolean = false,
+@@ -173,7 +173,7 @@ data class MusicPlayerState(
+  */
+ data class PlaybackChromeState(
+     val current: PlayableTrack? = null,
+-    val sourceLabel: String = "AdiMusic",
++    val sourceLabel: String = "ADJ",
+     val isPlaying: Boolean = false,
+     val isBuffering: Boolean = false,
+     val queueSize: Int = 0,
+@@ -1716,7 +1716,7 @@ class MusicPlayer @Inject constructor(
+ 
+     fun play(
+         track: PlayableTrack,
+-        sourceLabel: String = "AdiMusic",
++        sourceLabel: String = "ADJ",
+         startRadio: Boolean = true,
+     ) {
+         pendingRestoredSession = null
+@@ -1746,7 +1746,7 @@ class MusicPlayer @Inject constructor(
+     fun playQueue(
+         tracks: List<PlayableTrack>,
+         startIndex: Int = 0,
+-        sourceLabel: String = "AdiMusic",
++        sourceLabel: String = "ADJ",
+         startShuffled: Boolean = false,
+     ) {
+         disableRadioQueue()
+diff --git a/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt b/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt
+index 07760dc5..855d43b6 100644
+--- a/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt
++++ b/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt
+@@ -92,10 +92,10 @@ class AuthViewModel @Inject constructor(
+                 _webAuthState.value = WebAuthState.AwaitingApproval(url)
+             }
+             BackupCheck.UnsupportedSchema -> {
+-                _webAuthState.value = WebAuthState.Error("This backup was created by a newer AdiMusic version")
++                _webAuthState.value = WebAuthState.Error("This backup was created by a newer ADJ version")
+             }
+             BackupCheck.Invalid -> {
+-                _webAuthState.value = WebAuthState.Error("That file is not a valid AdiMusic backup")
++                _webAuthState.value = WebAuthState.Error("That file is not a valid ADJ backup")
+             }
+         }
+     }
+@@ -109,11 +109,11 @@ class AuthViewModel @Inject constructor(
+     fun restoreBackupOnly(content: String) {
+         when (backupRepository.checkBackup(content)) {
+             BackupCheck.UnsupportedSchema -> {
+-                _webAuthState.value = WebAuthState.Error("This backup was created by a newer AdiMusic version")
++                _webAuthState.value = WebAuthState.Error("This backup was created by a newer ADJ version")
+                 return
+             }
+             BackupCheck.Invalid -> {
+-                _webAuthState.value = WebAuthState.Error("That file is not a valid AdiMusic backup")
++                _webAuthState.value = WebAuthState.Error("That file is not a valid ADJ backup")
+                 return
+             }
+             is BackupCheck.Valid -> Unit
+@@ -128,10 +128,10 @@ class AuthViewModel @Inject constructor(
+             ) {
+                 is RestoreResult.Success -> WebAuthState.Idle
+                 RestoreResult.UnsupportedSchema -> WebAuthState.Error(
+-                    "This backup was created by a newer AdiMusic version",
++                    "This backup was created by a newer ADJ version",
+                 )
+                 RestoreResult.InvalidFile -> WebAuthState.Error(
+-                    "That file is not a valid AdiMusic backup",
++                    "That file is not a valid ADJ backup",
+                 )
+                 is RestoreResult.Failed -> WebAuthState.Error(restoreResult.message)
+             }
+@@ -166,10 +166,10 @@ class AuthViewModel @Inject constructor(
+                     ) {
+                         is RestoreResult.Success -> WebAuthState.Idle
+                         RestoreResult.UnsupportedSchema -> WebAuthState.Error(
+-                            "This backup was created by a newer AdiMusic version",
++                            "This backup was created by a newer ADJ version",
+                         )
+                         RestoreResult.InvalidFile -> WebAuthState.Error(
+-                            "That file is not a valid AdiMusic backup",
++                            "That file is not a valid ADJ backup",
+                         )
+                         is RestoreResult.Failed -> WebAuthState.Error(restoreResult.message)
+                     }
+diff --git a/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt b/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt
+index b63f1409..b19a5694 100644
+--- a/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt
+@@ -109,7 +109,7 @@ fun LoginScreen(
+                         )
+                     }
+                 }
+-                Text("AdiMusic", style = MaterialTheme.typography.headlineMedium)
++                Text("ADJ", style = MaterialTheme.typography.headlineMedium)
+                 Text(
+                     "Your music, your way — powered by YouTube Music",
+                     style = MaterialTheme.typography.bodyMedium,
 diff --git a/app/src/main/java/com/lastwave/app/ui/common/GlassButtons.kt b/app/src/main/java/com/lastwave/app/ui/common/GlassButtons.kt
 new file mode 100644
-index 0000000..49580a1
+index 00000000..49580a11
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/common/GlassButtons.kt
 @@ -0,0 +1,163 @@
@@ -381,7 +612,7 @@ index 0000000..49580a1
 +    )
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt b/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt
-index 6ac6d59..cc7a22e 100644
+index 6ac6d59b..cc7a22e5 100644
 --- a/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt
 @@ -15,6 +15,12 @@ import androidx.compose.runtime.Composable
@@ -426,8 +657,34 @@ index 6ac6d59..cc7a22e 100644
              .padding(start = 10.dp)
              .width(26.dp)
              .height(32.dp),
+diff --git a/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt b/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt
+index 650d1987..5b278939 100644
+--- a/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt
++++ b/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt
+@@ -281,7 +281,7 @@ fun TrackContextMenuSheet(
+     capabilities: TrackMenuCapabilities,
+     playableTrack: PlayableTrack? = null,
+     onDismiss: () -> Unit,
+-    playbackSourceLabel: String = "AdiMusic",
++    playbackSourceLabel: String = "ADJ",
+     onPlayInLastWave: (() -> Unit)? = null,
+     onStartMix: ((trackName: String, artistName: String) -> Unit)? = null,
+     onExploreGenre: ((genre: String) -> Unit)? = null,
+diff --git a/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt b/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt
+index 1a55d93e..b9a1334b 100644
+--- a/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt
++++ b/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt
+@@ -74,7 +74,7 @@ data class TrackMiniTrayData(
+     val album: String? = null,
+     val artworkUrl: String? = null,
+     val videoId: String? = null,
+-    val sourceLabel: String = "AdiMusic",
++    val sourceLabel: String = "ADJ",
+     val onPlay: (() -> Unit)? = null,
+ ) {
+     fun toPlayable(): PlayableTrack = PlayableTrack(
 diff --git a/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt b/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt
-index 26c6fcc..7f52206 100644
+index 26c6fcc2..7f52206d 100644
 --- a/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt
 @@ -56,13 +56,15 @@ import androidx.compose.material3.DropdownMenu
@@ -493,7 +750,7 @@ index 26c6fcc..7f52206 100644
                      modifier = Modifier.weight(1f).height(38.dp),
                      shape = BadgePillShape,
 diff --git a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
-index 21d4f35..91a4973 100644
+index 21d4f350..62255ef9 100644
 --- a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
 @@ -399,7 +399,6 @@ fun LastWaveNavHost(
@@ -517,11 +774,127 @@ index 21d4f35..91a4973 100644
          composable(Screen.HomeSections.route) {
              PredictiveBackScreen(onBack = { navController.popBackStack() }) {
                  com.lastwave.app.ui.settings.HomeSectionsScreen(onBack = { navController.popBackStack() })
+@@ -613,7 +606,7 @@ private fun LaunchGate() {
+                 )
+             }
+             Spacer(Modifier.height(18.dp))
+-            Text("AdiMusic", style = MaterialTheme.typography.headlineSmall)
++            Text("ADJ", style = MaterialTheme.typography.headlineSmall)
+             Spacer(Modifier.height(20.dp))
+             ExpressiveLoadingIndicator(message = "Preparing your music")
+         }
+diff --git a/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt b/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
+index 8b0c1c2a..1d7a3237 100644
+--- a/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
++++ b/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
+@@ -2164,7 +2164,7 @@ private fun FullPlayer(
+                             if (currentTab == FullPlayerTab.LYRICS) {
+                                 "${track.title} • ${track.artist}"
+                             } else {
+-                                state.sourceLabel.takeIf { it.isNotBlank() } ?: "AdiMusic"
++                                state.sourceLabel.takeIf { it.isNotBlank() } ?: "ADJ"
+                             },
+                             style = MaterialTheme.typography.bodySmall,
+                             color = Color.White.copy(alpha = 0.70f),
+@@ -2674,7 +2674,7 @@ private fun FullPlayer(
+                                                 ),
+                                                 label = "likeScale",
+                                             )
+-                                            // AdiMusic: pop animation on like toggle. The press-scale above
++                                            // ADJ: pop animation on like toggle. The press-scale above
+                                             // alone never fired reliably through the glass surface, so the
+                                             // heart now visibly pops whenever the liked state flips.
+                                             val likePop = remember { Animatable(1f) }
+diff --git a/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt b/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt
+index 2d067590..aaff286e 100644
+--- a/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt
++++ b/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt
+@@ -252,7 +252,7 @@ class DownloadsViewModel @Inject constructor(
+             downloadTreeUri.value,
+         )
+ 
+-    /** Human-readable label ("SD card › Music/AdiMusic"), or null when the
++    /** Human-readable label ("SD card › Music/ADJ"), or null when the
+      *  default location is active or the grant was lost. */
+     fun describeCustomLocation(): String? =
+         com.lastwave.app.data.download.SafTreeFiles.describeLocation(
+diff --git a/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt
+index c40de2d2..c1d4d99b 100644
+--- a/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt
+@@ -136,7 +136,7 @@ fun ExternalPlaylistImportScreen(
+                                 fontWeight = FontWeight.Bold,
+                             )
+                             Text(
+-                                "Paste a public Spotify or Apple Music playlist link. AdiMusic reads every track off the playlist page and matches them to playable songs — no account or API key needed.",
++                                "Paste a public Spotify or Apple Music playlist link. ADJ reads every track off the playlist page and matches them to playable songs — no account or API key needed.",
+                                 style = MaterialTheme.typography.bodyMedium,
+                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                             )
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
-index 0f03515..d115e30 100644
+index 0f03515e..1c7fac83 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
-@@ -385,16 +385,6 @@ enum class SettingsTab(
+@@ -32,9 +32,11 @@ import androidx.compose.ui.text.AnnotatedString
+ import androidx.compose.ui.text.SpanStyle
+ import androidx.compose.ui.text.buildAnnotatedString
+ import androidx.compose.ui.text.input.ImeAction
++import androidx.compose.ui.text.input.KeyboardType
+ import androidx.compose.ui.text.withStyle
+ import com.lastwave.app.ui.common.HeaderActionIcon
+ import android.content.Intent
++import android.graphics.Bitmap
+ import android.net.Uri
+ import androidx.activity.compose.rememberLauncherForActivityResult
+ import androidx.activity.result.contract.ActivityResultContracts
+@@ -44,6 +46,7 @@ import androidx.compose.animation.core.animateDpAsState
+ import androidx.compose.animation.core.animateFloatAsState
+ import androidx.compose.animation.core.spring
+ import androidx.compose.foundation.BorderStroke
++import androidx.compose.foundation.Image
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.border
+ import androidx.compose.foundation.clickable
+@@ -64,6 +67,7 @@ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.heightIn
++import androidx.compose.foundation.layout.imePadding
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.width
+@@ -131,6 +135,7 @@ import androidx.compose.material.icons.filled.QueueMusic
+ import androidx.compose.material.icons.filled.FileDownload
+ import androidx.compose.material.icons.filled.FormatListBulleted
+ import androidx.compose.material.icons.filled.Extension
++import androidx.compose.material.icons.filled.Favorite
+ import androidx.compose.material3.AlertDialog
+ import androidx.compose.material3.Button
+ import androidx.compose.material3.Card
+@@ -169,8 +174,10 @@ import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.draw.scale
+ import androidx.compose.ui.draw.shadow
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.asImageBitmap
+ import androidx.compose.ui.graphics.graphicsLayer
+ import androidx.compose.ui.graphics.vector.ImageVector
++import androidx.compose.ui.layout.ContentScale
+ import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.res.colorResource
+ import androidx.compose.ui.res.painterResource
+@@ -218,6 +225,11 @@ import com.lastwave.app.ui.common.ConnectedButtonItem
+ import com.lastwave.app.ui.common.ExpressiveHeader
+ import com.lastwave.app.ui.common.safeDrawingBottomPadding
+ import com.lastwave.app.ui.common.safeHorizontalContentPadding
++import com.google.zxing.BarcodeFormat
++import com.google.zxing.EncodeHintType
++import com.google.zxing.MultiFormatWriter
++import java.math.BigDecimal
++import java.math.RoundingMode
+ import com.lastwave.app.ui.common.adaptiveContentWidth
+ import com.lastwave.app.ui.theme.ExpressivePillShape
+ import androidx.compose.material.icons.filled.BrightnessAuto
+@@ -385,16 +397,6 @@ enum class SettingsTab(
          subtitle = "Themes, Colors, Artwork, Lyrics",
          icon = Icons.Filled.Palette,
      ),
@@ -538,7 +911,16 @@ index 0f03515..d115e30 100644
      LIBRARY(
          title = "Library & Content",
          subtitle = "Home layout, Playlist imports, Downloads, Exclusions",
-@@ -418,7 +408,6 @@ fun SettingsScreen(
+@@ -407,7 +409,7 @@ enum class SettingsTab(
+     ),
+     ABOUT(
+         title = "About & System",
+-        subtitle = "App language, Updates, Community, Diagnostics, Source code",
++        subtitle = "App language, Support, Community, Source code",
+         icon = Icons.Filled.AutoAwesome,
+     ),
+ }
+@@ -418,7 +420,6 @@ fun SettingsScreen(
      onBack: () -> Unit = {},
      onLoggedOut: () -> Unit = {},
      onOpenDownloads: () -> Unit = {},
@@ -546,7 +928,15 @@ index 0f03515..d115e30 100644
      onOpenHomeSections: () -> Unit = {},
      onOpenExcludedSongs: () -> Unit = {},
      onOpenYouTubeImport: () -> Unit = {},
-@@ -656,43 +645,6 @@ fun SettingsScreen(
+@@ -482,6 +483,7 @@ fun SettingsScreen(
+     var showYtChannelSheet by remember { mutableStateOf(false) }
+     var showYtDisconnectConfirm by remember { mutableStateOf(false) }
+     var showLanguageDialog by remember { mutableStateOf(false) }
++    var showSupportPanel by rememberSaveable { mutableStateOf(false) }
+     val currentLanguage = remember(misc.appLanguageTag) { AppLanguage.fromTag(misc.appLanguageTag) }
+ 
+     // Sends the user to Android's own Notification Listener access screen
+@@ -656,43 +658,6 @@ fun SettingsScreen(
              ) {
                  when (tab) {
                      null -> {
@@ -590,7 +980,16 @@ index 0f03515..d115e30 100644
  
                          item {
                              Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-@@ -1291,211 +1243,6 @@ fun SettingsScreen(
+@@ -753,7 +718,7 @@ fun SettingsScreen(
+                                             iconContainer = MaterialTheme.colorScheme.primaryContainer,
+                                             iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                             title = "About & System",
+-                                            subtitle = if (updateInfo.isUpdateAvailable) "Update Available (${updateInfo.latestVersion}) \u2022 v${appVersionName(context)}" else "v${appVersionName(context)} \u2022 Language, Community, Source code",
++                                            subtitle = "v${appVersionName(context)} • Language, Support, Source code",
+                                             onClick = { activeTab = SettingsTab.ABOUT },
+                                             position = position,
+                                         )
+@@ -1291,211 +1256,6 @@ fun SettingsScreen(
              }
                      }
  
@@ -802,7 +1201,169 @@ index 0f03515..d115e30 100644
  
  
  
-@@ -3576,13 +3323,6 @@ private fun AboutCard(versionName: String) {
+@@ -1666,102 +1426,20 @@ fun SettingsScreen(
+                     SettingsGroup(rowCount = 1) { index, position ->
+                         when (index) {
+                             0 -> SettingsActionCard(
+-                                icon = Icons.Filled.Code,
+-                                iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+-                                iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+-                                title = stringResource(R.string.settings_diagnostics),
+-                                subtitle = stringResource(R.string.settings_diagnostics_sub),
+-                                onClick = { viewModel.exportDiagnostics() },
++                                icon = Icons.Filled.Favorite,
++                                iconContainer = MaterialTheme.colorScheme.primaryContainer,
++                                iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
++                                title = "Support ADJ",
++                                subtitle = "Donate any amount with a UPI QR",
++                                onClick = { showSupportPanel = true },
+                                 position = position,
+-                                isHighlighted = (highlightedSettingId == "about.diagnostics"),
++                                isHighlighted = (highlightedSettingId == "about.support"),
+                             )
+                         }
+                     }
+                     Spacer(Modifier.height(4.dp))
+ 
+-                    // Prominent Update Available Banner Card (if newer version detected)
+-                    if (updateInfo.isUpdateAvailable) {
+-                        Surface(
+-                            shape = CardOuterShape,
+-                            color = MaterialTheme.colorScheme.primaryContainer,
+-                            shadowElevation = 3.dp,
+-                            modifier = Modifier
+-                                .fillMaxWidth()
+-                                .clip(CardOuterShape)
+-                                .clickable { viewModel.openUpdate(context) },
+-                        ) {
+-                            Row(
+-                                modifier = Modifier
+-                                    .fillMaxWidth()
+-                                    .padding(16.dp),
+-                                verticalAlignment = Alignment.CenterVertically,
+-                                horizontalArrangement = Arrangement.spacedBy(14.dp),
+-                            ) {
+-                                Box(
+-                                    modifier = Modifier
+-                                        .size(46.dp)
+-                                        .background(MaterialTheme.colorScheme.primary, CircleShape),
+-                                    contentAlignment = Alignment.Center,
+-                                ) {
+-                                    Icon(
+-                                        imageVector = Icons.Filled.CloudDownload,
+-                                        contentDescription = null,
+-                                        tint = MaterialTheme.colorScheme.onPrimary,
+-                                        modifier = Modifier.size(24.dp),
+-                                    )
+-                                }
+-                                Column(modifier = Modifier.weight(1f)) {
+-                                    Text(
+-                                        text = "Update Available!",
+-                                        style = MaterialTheme.typography.titleMedium,
+-                                        fontWeight = FontWeight.Bold,
+-                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+-                                    )
+-                                    Text(
+-                                        text = "Version ${updateInfo.latestVersion} is ready to install",
+-                                        style = MaterialTheme.typography.bodySmall,
+-                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.85f),
+-                                    )
+-                                }
+-                                Surface(
+-                                    shape = RoundedCornerShape(14.dp),
+-                                    color = MaterialTheme.colorScheme.primary,
+-                                ) {
+-                                    Text(
+-                                        text = "Update",
+-                                        style = MaterialTheme.typography.labelMedium,
+-                                        fontWeight = FontWeight.Bold,
+-                                        color = MaterialTheme.colorScheme.onPrimary,
+-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+-                                    )
+-                                }
+-                            }
+-                        }
+-                        Spacer(Modifier.height(8.dp))
+-                    }
+-
+                     AboutCard(versionName = appVersionName(context))
+-
+-                    SettingsActionCard(
+-                        icon = Icons.Filled.CloudDownload,
+-                        iconContainer = if (updateInfo.isUpdateAvailable) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.secondaryContainer,
+-                        iconTint = if (updateInfo.isUpdateAvailable) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSecondaryContainer,
+-                        title = if (updateInfo.isUpdateAvailable) "Update Ready (${updateInfo.latestVersion})" else "Check for Updates",
+-                        subtitle = when {
+-                            updateInfo.isChecking -> "Checking GitHub releases..."
+-                            updateInfo.isUpdateAvailable -> "Tap to download new version"
+-                            !updateInfo.message.isNullOrBlank() -> updateInfo.message.orEmpty()
+-                            else -> "Current version: ${appVersionName(context)}"
+-                        },
+-                        onClick = {
+-                            if (updateInfo.isUpdateAvailable) {
+-                                viewModel.openUpdate(context)
+-                            } else {
+-                                viewModel.checkForUpdates()
+-                            }
+-                        },
+-                        isHighlighted = (highlightedSettingId == "about.check_updates"),
+-                    )
+                 }
+             }
+                     }
+@@ -1772,6 +1450,10 @@ fun SettingsScreen(
+     }
+     }
+ 
++    if (showSupportPanel) {
++        SupportAdjSheet(onDismiss = { showSupportPanel = false })
++    }
++
+     // -- Custom color wheel dialog (par 8.4) --
+     if (state.showColorWheel) {
+         ColorWheelSheet(onDismiss = viewModel::dismissColorWheel, onApply = viewModel::applyCustomColor)
+@@ -3537,31 +3219,16 @@ private fun AboutCard(versionName: String) {
+             Modifier.fillMaxWidth().padding(vertical = 28.dp, horizontal = 20.dp),
+             horizontalAlignment = Alignment.CenterHorizontally,
+         ) {
+-            Box(
+-                Modifier
+-                    .size(72.dp)
+-                    .clip(CircleShape)
+-                    // The launcher icon is an <adaptive-icon> XML on API 26+
+-                    // (mipmap-anydpi-v26/ic_launcher_round.xml) — Compose's
+-                    // painterResource() can only parse plain bitmap/vector
+-                    // drawables, not that root element, and throws the
+-                    // instant this composable enters composition. Rebuilding
+-                    // the same mark from its two real layers (the lime
+-                    // background color + the bars vector, both plain
+-                    // resources) reproduces it exactly without touching the
+-                    // adaptive icon resource at all.
+-                    .background(colorResource(R.color.ic_launcher_background)),
+-                contentAlignment = Alignment.Center,
+-            ) {
+-                Icon(
+-                    painter = painterResource(R.drawable.ic_launcher_logo),
+-                    contentDescription = "AdiMusic",
+-                    tint = Color.Unspecified,
+-                    modifier = Modifier.size(72.dp),
+-                )
+-            }
++            Image(
++                painter = painterResource(R.drawable.adj_logo),
++                contentDescription = "ADJ",
++                contentScale = ContentScale.Fit,
++                modifier = Modifier
++                    .size(112.dp)
++                    .clip(RoundedCornerShape(24.dp)),
++            )
+             Spacer(Modifier.height(14.dp))
+-            Text("AdiMusic", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
++            Text("ADJ", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+             Spacer(Modifier.height(8.dp))
+             Surface(
+                 shape = ExpressivePillShape,
+@@ -3576,13 +3243,6 @@ private fun AboutCard(versionName: String) {
                  )
              }
              Spacer(Modifier.height(12.dp))
@@ -816,11 +1377,219 @@ index 0f03515..d115e30 100644
              Text(
                  "Developed by Aditya Jha",
                  style = MaterialTheme.typography.bodySmall,
+@@ -3591,22 +3251,27 @@ private fun AboutCard(versionName: String) {
+                 fontWeight = FontWeight.Medium,
+             )
+             Spacer(Modifier.height(4.dp))
++            val schoolUri = remember { Uri.parse("https://www.indianpublicschoolhajipur.com/") }
++            val schoolLine = buildAnnotatedString {
++                append("I study at ")
++                withStyle(
++                    SpanStyle(
++                        color = MaterialTheme.colorScheme.primary,
++                        fontWeight = FontWeight.Medium,
++                        textDecoration = TextDecoration.Underline,
++                    ),
++                ) {
++                    append("Indian Public School, Hajipur")
++                }
++                append(".")
++            }
+             Text(
+-                "14 · Class 8 · Aspiring Software Engineer",
++                text = schoolLine,
+                 style = MaterialTheme.typography.bodySmall,
+                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                 textAlign = TextAlign.Center,
+-            )
+-            Spacer(Modifier.height(4.dp))
+-            val portfolioUri = remember { Uri.parse("https://iamadityajha.vercel.app") }
+-            Text(
+-                "iamadityajha.vercel.app",
+-                style = MaterialTheme.typography.bodySmall.copy(textDecoration = TextDecoration.Underline),
+-                color = MaterialTheme.colorScheme.primary,
+-                textAlign = TextAlign.Center,
+-                fontWeight = FontWeight.Medium,
+                 modifier = Modifier.clickable {
+-                    val intent = Intent(Intent.ACTION_VIEW, portfolioUri)
++                    val intent = Intent(Intent.ACTION_VIEW, schoolUri)
+                     startActivitySafely(context, intent)
+                 },
+             )
+@@ -3621,6 +3286,142 @@ private fun AboutCard(versionName: String) {
+     }
+ }
+ 
++private fun parseDonationAmount(input: String): BigDecimal? {
++    val trimmed = input.trim()
++    if (!Regex("""\d+(\.\d{1,2})?""").matches(trimmed)) return null
++    val value = trimmed.toBigDecimalOrNull() ?: return null
++    return if (value > BigDecimal.ZERO) value.setScale(2, RoundingMode.HALF_UP) else null
++}
++
++private fun upiDonationPayload(amount: BigDecimal): String {
++    val formattedAmount = amount.setScale(2, RoundingMode.HALF_UP).toPlainString()
++    return "upi://pay?pa=anshujha3031@axl&pn=ANSHU%20KUMARI&cu=INR&am=$formattedAmount"
++}
++
++private fun generateUpiQrBitmap(payload: String): Bitmap? {
++    return try {
++        val hints = mapOf(EncodeHintType.MARGIN to 2)
++        val matrix = MultiFormatWriter().encode(payload, BarcodeFormat.QR_CODE, 720, 720, hints)
++        val bitmap = Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888)
++        for (y in 0 until matrix.height) {
++            for (x in 0 until matrix.width) {
++                bitmap.setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
++            }
++        }
++        bitmap
++    } catch (_: Exception) {
++        null
++    }
++}
++
++@OptIn(ExperimentalMaterial3Api::class)
++@Composable
++private fun SupportAdjSheet(onDismiss: () -> Unit) {
++    val context = LocalContext.current
++    val reducedMotion = remember {
++        runCatching {
++            android.provider.Settings.Global.getFloat(
++                context.contentResolver,
++                android.provider.Settings.Global.ANIMATOR_DURATION_SCALE,
++                1f,
++            ) == 0f
++        }.getOrDefault(false)
++    }
++    var amountText by rememberSaveable { mutableStateOf("") }
++    val amount = remember(amountText) { parseDonationAmount(amountText) }
++    val qrBitmap = remember(amount) { amount?.let { generateUpiQrBitmap(upiDonationPayload(it)) } }
++    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
++
++    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
++        Column(
++            modifier = Modifier
++                .fillMaxWidth()
++                .imePadding()
++                .verticalScroll(rememberScrollState())
++                .padding(horizontal = 20.dp)
++                .padding(bottom = 28.dp),
++            verticalArrangement = Arrangement.spacedBy(14.dp),
++        ) {
++            Row(
++                modifier = Modifier.fillMaxWidth(),
++                verticalAlignment = Alignment.CenterVertically,
++            ) {
++                Text(
++                    text = "Support ADJ",
++                    style = MaterialTheme.typography.titleLarge,
++                    fontWeight = FontWeight.Bold,
++                    modifier = Modifier.weight(1f),
++                )
++                IconButton(onClick = onDismiss) {
++                    Icon(Icons.Filled.Close, contentDescription = "Close")
++                }
++            }
++            Text(
++                text = "Enter an amount to generate a UPI payment QR.",
++                style = MaterialTheme.typography.bodyMedium,
++                color = MaterialTheme.colorScheme.onSurfaceVariant,
++            )
++            OutlinedTextField(
++                value = amountText,
++                onValueChange = { amountText = it },
++                label = { Text("Amount (₹)") },
++                placeholder = { Text("50") },
++                singleLine = true,
++                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
++                modifier = Modifier.fillMaxWidth(),
++            )
++            AnimatedVisibility(
++                visible = amount != null && qrBitmap != null,
++                enter = if (reducedMotion) fadeIn(tween(0)) else fadeIn(tween(220)) + expandVertically(tween(220)),
++                exit = if (reducedMotion) fadeOut(tween(0)) else fadeOut(tween(160)) + shrinkVertically(tween(160)),
++            ) {
++                Column(
++                    modifier = Modifier.fillMaxWidth(),
++                    horizontalAlignment = Alignment.CenterHorizontally,
++                    verticalArrangement = Arrangement.spacedBy(10.dp),
++                ) {
++                    qrBitmap?.let { bitmap ->
++                        Image(
++                            bitmap = bitmap.asImageBitmap(),
++                            contentDescription = "UPI payment QR",
++                            modifier = Modifier
++                                .size(240.dp)
++                                .background(Color.White, RoundedCornerShape(16.dp))
++                                .padding(12.dp),
++                        )
++                    }
++                    amount?.let { validAmount ->
++                        Text(
++                            text = "Payee: ANSHU KUMARI",
++                            style = MaterialTheme.typography.bodyMedium,
++                            fontWeight = FontWeight.Medium,
++                            textAlign = TextAlign.Center,
++                        )
++                        Text(
++                            text = "UPI ID: anshujha3031@axl",
++                            style = MaterialTheme.typography.bodyMedium,
++                            color = MaterialTheme.colorScheme.onSurfaceVariant,
++                            textAlign = TextAlign.Center,
++                        )
++                        Text(
++                            text = "Amount: ₹${validAmount.toPlainString()}",
++                            style = MaterialTheme.typography.bodyMedium,
++                            color = MaterialTheme.colorScheme.onSurfaceVariant,
++                            textAlign = TextAlign.Center,
++                        )
++                    }
++                }
++            }
++            TextButton(
++                onClick = onDismiss,
++                modifier = Modifier.align(Alignment.End),
++            ) {
++                Text("Close")
++            }
++        }
++    }
++}
++
+ private fun openTelegramChannel(context: android.content.Context, handleOrUrl: String): Boolean {
+     val username = handleOrUrl
+         .removePrefix("https://t.me/")
+@@ -4344,7 +4145,7 @@ private fun YouTubeChannelSheet(
+                 Column(Modifier.weight(1f)) {
+                     Text("YouTube Channel", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                     Text(
+-                        "Pick which channel's library, likes & history AdiMusic uses",
++                        "Pick which channel's library, likes & history ADJ uses",
+                         style = MaterialTheme.typography.bodySmall,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                     )
+@@ -4506,7 +4307,7 @@ private fun YouTubeLibraryVisibilitySheet(
+                 Column(Modifier.weight(1f)) {
+                     Text("YouTube Playlists Shown", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                     Text(
+-                        "Choose which account playlists appear in AdiMusic",
++                        "Choose which account playlists appear in ADJ",
+                         style = MaterialTheme.typography.bodySmall,
+                         color = MaterialTheme.colorScheme.onSurfaceVariant,
+                     )
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
-index bd29df0..0c1f367 100644
+index bd29df03..8d20c175 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
-@@ -627,184 +627,6 @@ object SettingsSearchIndex {
+@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Contrast
+ import androidx.compose.material.icons.filled.Dashboard
+ import androidx.compose.material.icons.filled.Delete
+ import androidx.compose.material.icons.filled.Extension
++import androidx.compose.material.icons.filled.Favorite
+ import androidx.compose.material.icons.filled.Public
+ import androidx.compose.material.icons.filled.FileDownload
+ import androidx.compose.material.icons.filled.FormatListBulleted
+@@ -627,184 +628,6 @@ object SettingsSearchIndex {
                  )
              )
  
@@ -1005,8 +1774,48 @@ index bd29df0..0c1f367 100644
              // ==========================================
              // TAB: NOTIFICATION SCROBBLER
              // ==========================================
+@@ -1039,33 +862,17 @@ object SettingsSearchIndex {
+                     type = EntryType.ACTION,
+                 )
+             )
+-            add(
+-                SettingsEntry(
+-                    id = "about.diagnostics",
+-                    title = "Export Diagnostics & Logs",
+-                    subtitle = "Export diagnostic report, crash logs, and hardware device info",
+-                    keywords = listOf(
+-                        "diagnostics", "logs", "crash logs", "debug info", "report issue", "bug report",
+-                        "troubleshooting", "system info"
+-                    ),
+-                    icon = Icons.Filled.Code,
+-                    iconContainer = { MaterialTheme.colorScheme.secondaryContainer },
+-                    iconTint = { MaterialTheme.colorScheme.onSecondaryContainer },
+-                    parentTab = SettingsTab.ABOUT,
+-                    section = "About & Community",
+-                    type = EntryType.ACTION,
+-                )
++            )
+             )
+             add(
+                 SettingsEntry(
+-                    id = "about.check_updates",
+-                    title = "Check for Updates",
+-                    subtitle = "Check GitHub releases for the latest version and changelog",
++                    id = "about.support",
++                    title = "Support ADJ",
++                    subtitle = "Donate any amount with a UPI QR",
+                     keywords = listOf(
+-                        "update", "check updates", "new version", "github releases", "changelog",
+-                        "download update", "latest release", "upgrade"
++                        "support", "donate", "donation", "upi", "qr", "payment"
+                     ),
+-                    icon = Icons.Filled.CloudDownload,
++                    icon = Icons.Filled.Favorite,
+                     iconContainer = { MaterialTheme.colorScheme.primaryContainer },
+                     iconTint = { MaterialTheme.colorScheme.onPrimaryContainer },
+                     parentTab = SettingsTab.ABOUT,
 diff --git a/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt b/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
-index 33b6163..9a36be9 100644
+index 33b61633..9a36be9d 100644
 --- a/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
 @@ -48,6 +48,7 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -1041,7 +1850,7 @@ index 33b6163..9a36be9 100644
  }
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/RoomRegistry.kt b/app/src/main/java/com/lastwave/app/ui/together/RoomRegistry.kt
 new file mode 100644
-index 0000000..c63eb42
+index 00000000..c63eb423
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/RoomRegistry.kt
 @@ -0,0 +1,167 @@
@@ -1214,7 +2023,7 @@ index 0000000..c63eb42
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
 new file mode 100644
-index 0000000..b164448
+index 00000000..b1644486
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
 @@ -0,0 +1,774 @@
@@ -1994,7 +2803,7 @@ index 0000000..b164448
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
 new file mode 100644
-index 0000000..b1314d6
+index 00000000..b1314d67
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
 @@ -0,0 +1,404 @@
@@ -2404,7 +3213,7 @@ index 0000000..b1314d6
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
 new file mode 100644
-index 0000000..820a150
+index 00000000..820a150f
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
 @@ -0,0 +1,988 @@
@@ -3396,11 +4205,1157 @@ index 0000000..820a150
 +        engine.release()
 +    }
 +}
+diff --git a/app/src/main/res/drawable-nodpi/adj_logo.jpg b/app/src/main/res/drawable-nodpi/adj_logo.jpg
+new file mode 100644
+index 0000000000000000000000000000000000000000..7e7d7f391a0218589ec57e0033c8058ff3763f4d
+GIT binary patch
+literal 35178
+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
+
+literal 0
+HcmV?d00001
+
+diff --git a/app/src/main/res/values-ar/strings.xml b/app/src/main/res/values-ar/strings.xml
+index 52881bb7..99c319ea 100644
+--- a/app/src/main/res/values-ar/strings.xml
++++ b/app/src/main/res/values-ar/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">مشغّل AdiMusic</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">مشغّل ADJ</string>
+     <string name="widget_description">الغلاف وتفاصيل المقطوعة وعناصر التحكم بالتشغيل لجميع تطبيقات الوسائط</string>
+ 
+     <string name="nav_feed">الموجز</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">يتوفر تحديث</string>
+     <string name="update">تحديث</string>
+     <string name="dismiss_update">إغلاق التحديث</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s جاهز للتثبيت</string>
++    <string name="update_ready_to_install">ADJ v%1$s جاهز للتثبيت</string>
+ 
+     <string name="settings">الإعدادات</string>
+     <string name="settings_section_language">اللغة</string>
+@@ -94,9 +94,6 @@
+     <string name="settings_section_about">حول</string>
+     <string name="settings_updates_support">التحديثات والدعم</string>
+     <string name="settings_more_from_us">المزيد منا</string>
+-    <string name="settings_diagnostics">تصدير التشخيص</string>
+-    <string name="settings_diagnostics_sub">مشاركة السجلات لاستكشاف الأخطاء</string>
+-    <string name="settings_check_updates">التحقق من التحديثات</string>
+     <string name="settings_source_code">الشيفرة المصدرية</string>
+ 
+     <string name="common_cancel">إلغاء</string>
+@@ -116,7 +113,7 @@
+     <string name="dialog_clear_all_text">سيؤدي هذا إلى إزالة بيانات الاعتماد والقوائم والبيانات المخزنة. لا يمكن التراجع.</string>
+     <string name="dialog_clear_all_confirm">مسح الكل</string>
+     <string name="dialog_disconnect_yt_title">قطع اتصال YouTube Music؟</string>
+-    <string name="dialog_disconnect_yt_text">القوائم المنعكسة في حسابك تبقى، لكن AdiMusic يتوقف عن المزامنة وينسى الاتصال.</string>
++    <string name="dialog_disconnect_yt_text">القوائم المنعكسة في حسابك تبقى، لكن ADJ يتوقف عن المزامنة وينسى الاتصال.</string>
+     <string name="dialog_logout_title">تسجيل الخروج من Last.fm؟</string>
+     <string name="dialog_logout_text">ستبقى قوائمك وبياناتك المخزنة.</string>
+     <string name="common_save">حفظ</string>
+diff --git a/app/src/main/res/values-de/strings.xml b/app/src/main/res/values-de/strings.xml
+index ad258de1..2c5f2853 100644
+--- a/app/src/main/res/values-de/strings.xml
++++ b/app/src/main/res/values-de/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">AdiMusic Player</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">ADJ Player</string>
+     <string name="widget_description">Cover, Trackdetails und Wiedergabesteuerung für alle Medien-Apps</string>
+ 
+     <string name="nav_feed">Feed</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Update verfügbar</string>
+     <string name="update">Aktualisieren</string>
+     <string name="dismiss_update">Update verwerfen</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s ist bereit zur Installation</string>
++    <string name="update_ready_to_install">ADJ v%1$s ist bereit zur Installation</string>
+ 
+     <string name="settings">Einstellungen</string>
+     <string name="settings_section_language">Sprache</string>
+@@ -94,9 +94,6 @@
+     <string name="settings_section_about">Über</string>
+     <string name="settings_updates_support">Updates &amp; Support</string>
+     <string name="settings_more_from_us">Mehr von uns</string>
+-    <string name="settings_diagnostics">Diagnose exportieren</string>
+-    <string name="settings_diagnostics_sub">Logs zur Fehlerbehebung teilen</string>
+-    <string name="settings_check_updates">Nach Updates suchen</string>
+     <string name="settings_source_code">Quellcode</string>
+ 
+     <string name="common_cancel">Abbrechen</string>
+@@ -116,7 +113,7 @@
+     <string name="dialog_clear_all_text">Entfernt Anmeldedaten, Playlists und Cache. Kann nicht rückgängig gemacht werden.</string>
+     <string name="dialog_clear_all_confirm">Alles löschen</string>
+     <string name="dialog_disconnect_yt_title">YouTube Music trennen?</string>
+-    <string name="dialog_disconnect_yt_text">Bereits gespiegelte Playlists bleiben im Konto, aber AdiMusic stoppt den Sync und vergisst die Verbindung.</string>
++    <string name="dialog_disconnect_yt_text">Bereits gespiegelte Playlists bleiben im Konto, aber ADJ stoppt den Sync und vergisst die Verbindung.</string>
+     <string name="dialog_logout_title">Von Last.fm abmelden?</string>
+     <string name="dialog_logout_text">Playlists und Cache bleiben erhalten.</string>
+     <string name="common_save">Speichern</string>
+diff --git a/app/src/main/res/values-es/strings.xml b/app/src/main/res/values-es/strings.xml
+index 77b7e2a2..efc028dc 100644
+--- a/app/src/main/res/values-es/strings.xml
++++ b/app/src/main/res/values-es/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">Reproductor AdiMusic</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">Reproductor ADJ</string>
+     <string name="widget_description">Portada, detalles de la canción y controles de reproducción para todas las apps de música</string>
+ 
+     <string name="nav_feed">Inicio</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Actualización disponible</string>
+     <string name="update">Actualizar</string>
+     <string name="dismiss_update">Descartar actualización</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s lista para instalar</string>
++    <string name="update_ready_to_install">ADJ v%1$s lista para instalar</string>
+ 
+     <string name="settings">Ajustes</string>
+     <string name="settings_section_language">Idioma</string>
+@@ -94,9 +94,6 @@
+     <string name="settings_section_about">Acerca de</string>
+     <string name="settings_updates_support">Actualizaciones y soporte</string>
+     <string name="settings_more_from_us">Más de nosotros</string>
+-    <string name="settings_diagnostics">Exportar diagnóstico</string>
+-    <string name="settings_diagnostics_sub">Comparte registros para solucionar problemas</string>
+-    <string name="settings_check_updates">Buscar actualizaciones</string>
+     <string name="settings_source_code">Código fuente</string>
+ 
+     <string name="common_cancel">Cancelar</string>
+@@ -116,7 +113,7 @@
+     <string name="dialog_clear_all_text">Esto elimina tus credenciales, listas y datos en caché. No se puede deshacer.</string>
+     <string name="dialog_clear_all_confirm">Borrar todo</string>
+     <string name="dialog_disconnect_yt_title">¿Desconectar YouTube Music?</string>
+-    <string name="dialog_disconnect_yt_text">Las listas ya reflejadas en tu cuenta se conservan, pero AdiMusic deja de sincronizar y olvida la conexión.</string>
++    <string name="dialog_disconnect_yt_text">Las listas ya reflejadas en tu cuenta se conservan, pero ADJ deja de sincronizar y olvida la conexión.</string>
+     <string name="dialog_logout_title">¿Cerrar sesión de Last.fm?</string>
+     <string name="dialog_logout_text">Tus listas y datos en caché se conservarán.</string>
+     <string name="common_save">Guardar</string>
+diff --git a/app/src/main/res/values-fr/strings.xml b/app/src/main/res/values-fr/strings.xml
+index 24a43b92..ac910392 100644
+--- a/app/src/main/res/values-fr/strings.xml
++++ b/app/src/main/res/values-fr/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">Lecteur AdiMusic</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">Lecteur ADJ</string>
+     <string name="widget_description">Pochette, détails du morceau et contrôles de lecture pour toutes les apps média</string>
+ 
+     <string name="nav_feed">Fil</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Mise à jour disponible</string>
+     <string name="update">Mettre à jour</string>
+     <string name="dismiss_update">Ignorer la mise à jour</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s prête à installer</string>
++    <string name="update_ready_to_install">ADJ v%1$s prête à installer</string>
+ 
+     <string name="settings">Paramètres</string>
+     <string name="settings_section_language">Langue</string>
+@@ -94,9 +94,6 @@
+     <string name="settings_section_about">À propos</string>
+     <string name="settings_updates_support">Mises à jour et assistance</string>
+     <string name="settings_more_from_us">Plus de notre part</string>
+-    <string name="settings_diagnostics">Exporter le diagnostic</string>
+-    <string name="settings_diagnostics_sub">Partage les journaux pour le dépannage</string>
+-    <string name="settings_check_updates">Vérifier les mises à jour</string>
+     <string name="settings_source_code">Code source</string>
+ 
+     <string name="common_cancel">Annuler</string>
+@@ -116,7 +113,7 @@
+     <string name="dialog_clear_all_text">Supprime vos identifiants, playlists et données en cache. Irréversible.</string>
+     <string name="dialog_clear_all_confirm">Tout effacer</string>
+     <string name="dialog_disconnect_yt_title">Déconnecter YouTube Music ?</string>
+-    <string name="dialog_disconnect_yt_text">Les playlists déjà reflétées sur votre compte y restent, mais AdiMusic arrête la synchronisation et oublie la connexion.</string>
++    <string name="dialog_disconnect_yt_text">Les playlists déjà reflétées sur votre compte y restent, mais ADJ arrête la synchronisation et oublie la connexion.</string>
+     <string name="dialog_logout_title">Se déconnecter de Last.fm ?</string>
+     <string name="dialog_logout_text">Vos playlists et données en cache seront conservées.</string>
+     <string name="common_save">Enregistrer</string>
+diff --git a/app/src/main/res/values-hi/strings.xml b/app/src/main/res/values-hi/strings.xml
+index 437eac87..54b0e96d 100644
+--- a/app/src/main/res/values-hi/strings.xml
++++ b/app/src/main/res/values-hi/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">AdiMusic प्लेयर</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">ADJ प्लेयर</string>
+     <string name="widget_description">सभी मीडिया ऐप्स के लिए कवर, गाने की जानकारी और प्लेबैक नियंत्रण</string>
+ 
+     <string name="nav_feed">फ़ीड</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">अपडेट उपलब्ध</string>
+     <string name="update">अपडेट करें</string>
+     <string name="dismiss_update">अपडेट हटाएँ</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s इंस्टॉल के लिए तैयार</string>
++    <string name="update_ready_to_install">ADJ v%1$s इंस्टॉल के लिए तैयार</string>
+ 
+     <string name="settings">सेटिंग्स</string>
+     <string name="settings_section_language">भाषा</string>
+@@ -94,9 +94,6 @@
+     <string name="settings_section_about">परिचय</string>
+     <string name="settings_updates_support">अपडेट व सहायता</string>
+     <string name="settings_more_from_us">हमारी ओर से और</string>
+-    <string name="settings_diagnostics">डायग्नोस्टिक्स निर्यात करें</string>
+-    <string name="settings_diagnostics_sub">समस्या-निवारण हेतु लॉग साझा करें</string>
+-    <string name="settings_check_updates">अपडेट जाँचें</string>
+     <string name="settings_source_code">स्रोत कोड</string>
+ 
+     <string name="common_cancel">रद्द करें</string>
+@@ -116,7 +113,7 @@
+     <string name="dialog_clear_all_text">इससे क्रेडेंशियल, प्लेलिस्ट और कैश डेटा हट जाएगा। पूर्ववत नहीं होगा।</string>
+     <string name="dialog_clear_all_confirm">सब मिटाएँ</string>
+     <string name="dialog_disconnect_yt_title">YouTube Music डिस्कनेक्ट करें?</string>
+-    <string name="dialog_disconnect_yt_text">खाते में प्रतिबिंबित प्लेलिस्ट वहीं रहेंगी, पर AdiMusic सिंक बंद कर देगा और कनेक्शन भूल जाएगा।</string>
++    <string name="dialog_disconnect_yt_text">खाते में प्रतिबिंबित प्लेलिस्ट वहीं रहेंगी, पर ADJ सिंक बंद कर देगा और कनेक्शन भूल जाएगा।</string>
+     <string name="dialog_logout_title">Last.fm से लॉग आउट करें?</string>
+     <string name="dialog_logout_text">आपकी प्लेलिस्ट और कैश डेटा रखा जाएगा।</string>
+     <string name="common_save">सहेजें</string>
+diff --git a/app/src/main/res/values-in/strings.xml b/app/src/main/res/values-in/strings.xml
+index 8dbd4940..b48fde4f 100644
+--- a/app/src/main/res/values-in/strings.xml
++++ b/app/src/main/res/values-in/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">Pemutar AdiMusic</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">Pemutar ADJ</string>
+     <string name="widget_description">Sampul, detail lagu, dan kontrol pemutaran untuk semua aplikasi media</string>
+ 
+     <string name="nav_feed">Beranda</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Pembaruan tersedia</string>
+     <string name="update">Perbarui</string>
+     <string name="dismiss_update">Abaikan pembaruan</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s siap dipasang</string>
++    <string name="update_ready_to_install">ADJ v%1$s siap dipasang</string>
+ 
+     <string name="settings">Pengaturan</string>
+     <string name="settings_section_language">Bahasa</string>
+@@ -94,9 +94,6 @@
+     <string name="settings_section_about">Tentang</string>
+     <string name="settings_updates_support">Pembaruan &amp; Dukungan</string>
+     <string name="settings_more_from_us">Lainnya dari kami</string>
+-    <string name="settings_diagnostics">Ekspor diagnostik</string>
+-    <string name="settings_diagnostics_sub">Bagikan log untuk pemecahan masalah</string>
+-    <string name="settings_check_updates">Periksa pembaruan</string>
+     <string name="settings_source_code">Kode sumber</string>
+ 
+     <string name="common_cancel">Batal</string>
+@@ -116,7 +113,7 @@
+     <string name="dialog_clear_all_text">Ini menghapus kredensial, playlist, dan data cache. Tidak dapat dibatalkan.</string>
+     <string name="dialog_clear_all_confirm">Hapus semua</string>
+     <string name="dialog_disconnect_yt_title">Putuskan YouTube Music?</string>
+-    <string name="dialog_disconnect_yt_text">Playlist yang sudah dicerminkan ke akun tetap ada, tetapi AdiMusic berhenti menyinkronkan dan melupakan koneksi.</string>
++    <string name="dialog_disconnect_yt_text">Playlist yang sudah dicerminkan ke akun tetap ada, tetapi ADJ berhenti menyinkronkan dan melupakan koneksi.</string>
+     <string name="dialog_logout_title">Keluar dari Last.fm?</string>
+     <string name="dialog_logout_text">Playlist dan data cache Anda tetap disimpan.</string>
+     <string name="common_save">Simpan</string>
+diff --git a/app/src/main/res/values-ja/strings.xml b/app/src/main/res/values-ja/strings.xml
+index 21c19815..2204e280 100644
+--- a/app/src/main/res/values-ja/strings.xml
++++ b/app/src/main/res/values-ja/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">AdiMusic プレーヤー</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">ADJ プレーヤー</string>
+     <string name="widget_description">すべてのメディアアプリのジャケット、曲情報、再生コントロール</string>
+ 
+     <string name="nav_feed">フィード</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">アップデートあり</string>
+     <string name="update">更新</string>
+     <string name="dismiss_update">アップデートを閉じる</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s をインストールできます</string>
++    <string name="update_ready_to_install">ADJ v%1$s をインストールできます</string>
+ 
+     <string name="settings">設定</string>
+     <string name="settings_section_language">言語</string>
+@@ -94,9 +94,6 @@
+     <string name="settings_section_about">このアプリについて</string>
+     <string name="settings_updates_support">アップデートとサポート</string>
+     <string name="settings_more_from_us">開発者の他のアプリ</string>
+-    <string name="settings_diagnostics">診断情報をエクスポート</string>
+-    <string name="settings_diagnostics_sub">トラブルシューティング用にログを共有</string>
+-    <string name="settings_check_updates">アップデートを確認</string>
+     <string name="settings_source_code">ソースコード</string>
+ 
+     <string name="common_cancel">キャンセル</string>
+@@ -116,7 +113,7 @@
+     <string name="dialog_clear_all_text">認証情報、プレイリスト、キャッシュデータが削除されます。元に戻せません。</string>
+     <string name="dialog_clear_all_confirm">すべて消去</string>
+     <string name="dialog_disconnect_yt_title">YouTube Music を切断しますか?</string>
+-    <string name="dialog_disconnect_yt_text">アカウントにミラー済みのプレイリストは残りますが、AdiMusic は同期を停止し接続を忘れます。</string>
++    <string name="dialog_disconnect_yt_text">アカウントにミラー済みのプレイリストは残りますが、ADJ は同期を停止し接続を忘れます。</string>
+     <string name="dialog_logout_title">Last.fm からログアウトしますか?</string>
+     <string name="dialog_logout_text">プレイリストとキャッシュデータは保持されます。</string>
+     <string name="common_save">保存</string>
+diff --git a/app/src/main/res/values-ko/strings.xml b/app/src/main/res/values-ko/strings.xml
+index ad49f3fb..de3e8e23 100644
+--- a/app/src/main/res/values-ko/strings.xml
++++ b/app/src/main/res/values-ko/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">AdiMusic 플레이어</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">ADJ 플레이어</string>
+     <string name="widget_description">모든 미디어 앱의 앨범아트, 곡 정보 및 재생 컨트롤</string>
+ 
+     <string name="nav_feed">피드</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">업데이트 있음</string>
+     <string name="update">업데이트</string>
+     <string name="dismiss_update">업데이트 닫기</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s를 설치할 수 있습니다</string>
++    <string name="update_ready_to_install">ADJ v%1$s를 설치할 수 있습니다</string>
+ 
+     <string name="settings">설정</string>
+     <string name="settings_section_language">언어</string>
+@@ -94,9 +94,6 @@
+     <string name="settings_section_about">정보</string>
+     <string name="settings_updates_support">업데이트 및 지원</string>
+     <string name="settings_more_from_us">개발자의 다른 앱</string>
+-    <string name="settings_diagnostics">진단 내보내기</string>
+-    <string name="settings_diagnostics_sub">문제 해결을 위해 로그 공유</string>
+-    <string name="settings_check_updates">업데이트 확인</string>
+     <string name="settings_source_code">소스 코드</string>
+ 
+     <string name="common_cancel">취소</string>
+@@ -116,7 +113,7 @@
+     <string name="dialog_clear_all_text">로그인 정보, 플레이리스트, 캐시 데이터가 삭제됩니다. 되돌릴 수 없습니다.</string>
+     <string name="dialog_clear_all_confirm">모두 지우기</string>
+     <string name="dialog_disconnect_yt_title">YouTube Music 연결을 해제할까요?</string>
+-    <string name="dialog_disconnect_yt_text">계정에 미러링된 플레이리스트는 유지되지만 AdiMusic는 동기화를 중단하고 연결을 삭제합니다.</string>
++    <string name="dialog_disconnect_yt_text">계정에 미러링된 플레이리스트는 유지되지만 ADJ는 동기화를 중단하고 연결을 삭제합니다.</string>
+     <string name="dialog_logout_title">Last.fm에서 로그아웃할까요?</string>
+     <string name="dialog_logout_text">플레이리스트와 캐시 데이터는 유지됩니다.</string>
+     <string name="common_save">저장</string>
+diff --git a/app/src/main/res/values-pt-rBR/strings.xml b/app/src/main/res/values-pt-rBR/strings.xml
+index fb097f49..6619d4fe 100644
+--- a/app/src/main/res/values-pt-rBR/strings.xml
++++ b/app/src/main/res/values-pt-rBR/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">AdiMusic Player</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">ADJ Player</string>
+     <string name="widget_description">Capa, detalhes da faixa e controles de reprodução para todos os apps de mídia</string>
+ 
+     <string name="nav_feed">Início</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Atualização disponível</string>
+     <string name="update">Atualizar</string>
+     <string name="dismiss_update">Dispensar atualização</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s pronta para instalar</string>
++    <string name="update_ready_to_install">ADJ v%1$s pronta para instalar</string>
+ 
+     <string name="settings">Configurações</string>
+     <string name="settings_section_language">Idioma</string>
+@@ -94,9 +94,6 @@
+     <string name="settings_section_about">Sobre</string>
+     <string name="settings_updates_support">Atualizações e suporte</string>
+     <string name="settings_more_from_us">Mais de nós</string>
+-    <string name="settings_diagnostics">Exportar diagnóstico</string>
+-    <string name="settings_diagnostics_sub">Compartilha registros para solução de problemas</string>
+-    <string name="settings_check_updates">Verificar atualizações</string>
+     <string name="settings_source_code">Código-fonte</string>
+ 
+     <string name="common_cancel">Cancelar</string>
+@@ -116,7 +113,7 @@
+     <string name="dialog_clear_all_text">Isso remove credenciais, playlists e dados em cache. Não pode ser desfeito.</string>
+     <string name="dialog_clear_all_confirm">Apagar tudo</string>
+     <string name="dialog_disconnect_yt_title">Desconectar o YouTube Music?</string>
+-    <string name="dialog_disconnect_yt_text">As playlists já espelhadas na sua conta permanecem, mas o AdiMusic para de sincronizar e esquece a conexão.</string>
++    <string name="dialog_disconnect_yt_text">As playlists já espelhadas na sua conta permanecem, mas o ADJ para de sincronizar e esquece a conexão.</string>
+     <string name="dialog_logout_title">Sair do Last.fm?</string>
+     <string name="dialog_logout_text">Suas playlists e dados em cache serão mantidos.</string>
+     <string name="common_save">Salvar</string>
+diff --git a/app/src/main/res/values-ru/strings.xml b/app/src/main/res/values-ru/strings.xml
+index 65062ac5..30f331db 100644
+--- a/app/src/main/res/values-ru/strings.xml
++++ b/app/src/main/res/values-ru/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">AdiMusic Плеер</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">ADJ Плеер</string>
+     <string name="widget_description">Обложка, информация о треке и управление воспроизведением для всех медиаприложений</string>
+ 
+     <string name="nav_feed">Лента</string>
+@@ -11,7 +11,7 @@
+     <string name="update_available">Доступно обновление</string>
+     <string name="update">Обновить</string>
+     <string name="dismiss_update">Скрыть обновление</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s готова к установке</string>
++    <string name="update_ready_to_install">ADJ v%1$s готова к установке</string>
+ 
+     <string name="settings">Настройки</string>
+     <string name="settings_section_language">Язык</string>
+@@ -94,9 +94,6 @@
+     <string name="settings_section_about">О приложении</string>
+     <string name="settings_updates_support">Обновления и поддержка</string>
+     <string name="settings_more_from_us">Больше от нас</string>
+-    <string name="settings_diagnostics">Экспорт диагностики</string>
+-    <string name="settings_diagnostics_sub">Поделиться журналами для решения проблем</string>
+-    <string name="settings_check_updates">Проверить обновления</string>
+     <string name="settings_source_code">Исходный код</string>
+ 
+     <string name="common_cancel">Отмена</string>
+@@ -116,7 +113,7 @@
+     <string name="dialog_clear_all_text">Это удалит ваши учётные данные, плейлисты и кэшированные данные. Действие необратимо.</string>
+     <string name="dialog_clear_all_confirm">Удалить всё</string>
+     <string name="dialog_disconnect_yt_title">Отключить YouTube Music?</string>
+-    <string name="dialog_disconnect_yt_text">Плейлисты, уже отражённые в вашем аккаунте, останутся, но AdiMusic прекратит синхронизацию и забудет подключение.</string>
++    <string name="dialog_disconnect_yt_text">Плейлисты, уже отражённые в вашем аккаунте, останутся, но ADJ прекратит синхронизацию и забудет подключение.</string>
+     <string name="dialog_logout_title">Выйти из Last.fm?</string>
+     <string name="dialog_logout_text">Ваши плейлисты и кэшированные данные сохранятся.</string>
+     <string name="common_save">Сохранить</string>
+diff --git a/app/src/main/res/values-tr/strings.xml b/app/src/main/res/values-tr/strings.xml
+index 46de715e..e207506d 100644
+--- a/app/src/main/res/values-tr/strings.xml
++++ b/app/src/main/res/values-tr/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">AdiMusic Oynatıcı</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">ADJ Oynatıcı</string>
+     <string name="widget_description">Tüm medya uygulamaları için kapak, parça bilgisi ve oynatma kontrolleri</string>
+ 
+     <!-- Alt gezinti -->
+@@ -12,7 +12,7 @@
+     <string name="update_available">Güncelleme Mevcut</string>
+     <string name="update">Güncelle</string>
+     <string name="dismiss_update">Güncellemeyi kapat</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s kurulmaya hazır</string>
++    <string name="update_ready_to_install">ADJ v%1$s kurulmaya hazır</string>
+ 
+     <!-- Ayarlar -->
+     <string name="settings">Ayarlar</string>
+@@ -96,9 +96,6 @@
+     <string name="settings_section_about">Hakkında</string>
+     <string name="settings_updates_support">Güncellemeler ve Destek</string>
+     <string name="settings_more_from_us">Bizden Daha Fazlası</string>
+-    <string name="settings_diagnostics">Tanılama verisini dışa aktar</string>
+-    <string name="settings_diagnostics_sub">Sorun giderme için günlükleri paylaşın</string>
+-    <string name="settings_check_updates">Güncellemeleri Denetle</string>
+     <string name="settings_source_code">Kaynak Kodu</string>
+ 
+     <!-- Ortak iletişim düğmeleri -->
+@@ -119,7 +116,7 @@
+     <string name="dialog_clear_all_text">Kimlik bilgileriniz, listeleriniz ve önbelleğe alınmış veriler kaldırılır. Bu işlem geri alınamaz.</string>
+     <string name="dialog_clear_all_confirm">Her Şeyi Temizle</string>
+     <string name="dialog_disconnect_yt_title">YouTube Music bağlantısı kesilsin mi?</string>
+-    <string name="dialog_disconnect_yt_text">Hesabınıza yansıtılan listeler orada kalır, ancak AdiMusic eşitlemeyi durdurur ve bağlantıyı unutur.</string>
++    <string name="dialog_disconnect_yt_text">Hesabınıza yansıtılan listeler orada kalır, ancak ADJ eşitlemeyi durdurur ve bağlantıyı unutur.</string>
+     <string name="dialog_logout_title">Last.fm\'den çıkış yapılsın mı?</string>
+     <string name="dialog_logout_text">Listeleriniz ve önbelleğe alınmış verileriniz korunur.</string>
+     <string name="common_save">Kaydet</string>
+diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
+index c3b76e1b..9ab7d23a 100644
+--- a/app/src/main/res/values-zh-rCN/strings.xml
++++ b/app/src/main/res/values-zh-rCN/strings.xml
+@@ -1,7 +1,7 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">AdiMusic 播放器</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">ADJ 播放器</string>
+     <string name="widget_description">所有媒体应用的封面、曲目信息和播放控制</string>
+ 
+     <!-- 底部导航 -->
+@@ -12,7 +12,7 @@
+     <string name="update_available">有可用更新</string>
+     <string name="update">更新</string>
+     <string name="dismiss_update">忽略更新</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s 已就绪，可安装</string>
++    <string name="update_ready_to_install">ADJ v%1$s 已就绪，可安装</string>
+ 
+     <!-- 设置 -->
+     <string name="settings">设置</string>
+@@ -96,9 +96,6 @@
+     <string name="settings_section_about">关于</string>
+     <string name="settings_updates_support">更新与支持</string>
+     <string name="settings_more_from_us">我们的更多作品</string>
+-    <string name="settings_diagnostics">导出诊断日志</string>
+-    <string name="settings_diagnostics_sub">分享日志以排查问题</string>
+-    <string name="settings_check_updates">检查更新</string>
+     <string name="settings_source_code">源代码</string>
+ 
+     <!-- 通用对话框按钮 -->
+@@ -119,7 +116,7 @@
+     <string name="dialog_clear_all_text">这将删除您的凭据、歌单和缓存数据，且无法撤销。</string>
+     <string name="dialog_clear_all_confirm">全部清除</string>
+     <string name="dialog_disconnect_yt_title">断开 YouTube Music？</string>
+-    <string name="dialog_disconnect_yt_text">已同步到您账号的歌单会保留，但 AdiMusic 将停止同步并忘记该连接。</string>
++    <string name="dialog_disconnect_yt_text">已同步到您账号的歌单会保留，但 ADJ 将停止同步并忘记该连接。</string>
+     <string name="dialog_logout_title">退出 Last.fm？</string>
+     <string name="dialog_logout_text">您的歌单和缓存数据将被保留。</string>
+     <string name="common_save">保存</string>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index ef8ddcb..cf18d54 100644
+index ef8ddcb3..e9b8bd62 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
-@@ -328,4 +328,64 @@
+@@ -1,9 +1,9 @@
+ <?xml version="1.0" encoding="utf-8"?>
+ <resources>
+-    <string name="app_name">AdiMusic</string>
+-    <string name="widget_name">AdiMusic Player</string>
++    <string name="app_name">ADJ</string>
++    <string name="widget_name">ADJ Player</string>
+     <string name="widget_description">Artwork, track details and playback controls for every media app</string>
+-    <string name="widget_obsidian_name">AdiMusic Obsidian Glass</string>
++    <string name="widget_obsidian_name">ADJ Obsidian Glass</string>
+     <string name="widget_obsidian_description">Frosted obsidian glass player with translucent depth and crystal rim</string>
+ 
+     <!-- Bottom navigation -->
+@@ -14,7 +14,7 @@
+     <string name="update_available">Update Available</string>
+     <string name="update">Update</string>
+     <string name="dismiss_update">Dismiss update</string>
+-    <string name="update_ready_to_install">AdiMusic v%1$s is ready to install</string>
++    <string name="update_ready_to_install">ADJ v%1$s is ready to install</string>
+ 
+     <!-- Settings -->
+     <string name="settings">Settings</string>
+@@ -127,9 +127,6 @@
+     <string name="settings_section_about">About</string>
+     <string name="settings_updates_support">Updates &amp; Support</string>
+     <string name="settings_more_from_us">More From Us</string>
+-    <string name="settings_diagnostics">Export diagnostics</string>
+-    <string name="settings_diagnostics_sub">Share logs for troubleshooting</string>
+-    <string name="settings_check_updates">Check for Updates</string>
+     <string name="settings_source_code">Source Code</string>
+ 
+     <!-- Common dialog buttons -->
+@@ -318,7 +315,7 @@
+     <string name="dialog_clear_all_text">This removes your credentials, playlists, downloaded songs, and cached data. This can\'t be undone.</string>
+     <string name="dialog_clear_all_confirm">Clear Everything</string>
+     <string name="dialog_disconnect_yt_title">Disconnect YouTube Music?</string>
+-    <string name="dialog_disconnect_yt_text">Playlists already mirrored to your account stay there, but AdiMusic stops syncing and forgets the connection.</string>
++    <string name="dialog_disconnect_yt_text">Playlists already mirrored to your account stay there, but ADJ stops syncing and forgets the connection.</string>
+     <string name="dialog_logout_title">Log out from Last.fm?</string>
+     <string name="dialog_logout_text">Your playlists and cached data will be kept.</string>
+ 
+@@ -328,4 +325,64 @@
      <string name="settings_search_no_results_sub">Try checking for typos or searching with different keywords</string>
      <string name="settings_search_clear">Clear search</string>
      <string name="settings_search_title">Search settings</string>
