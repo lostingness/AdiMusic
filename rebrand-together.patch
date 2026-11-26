@@ -832,7 +832,7 @@ index c40de2d2..c1d4d99b 100644
                                  color = MaterialTheme.colorScheme.onSurfaceVariant,
                              )
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
-index 0f03515e..1c7fac83 100644
+index 0f03515e..0e3ffd78 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
 @@ -32,9 +32,11 @@ import androidx.compose.ui.text.AnnotatedString
@@ -1377,16 +1377,17 @@ index 0f03515e..1c7fac83 100644
              Text(
                  "Developed by Aditya Jha",
                  style = MaterialTheme.typography.bodySmall,
-@@ -3591,22 +3251,27 @@ private fun AboutCard(versionName: String) {
+@@ -3591,22 +3251,28 @@ private fun AboutCard(versionName: String) {
                  fontWeight = FontWeight.Medium,
              )
              Spacer(Modifier.height(4.dp))
 +            val schoolUri = remember { Uri.parse("https://www.indianpublicschoolhajipur.com/") }
++            val accentColor = MaterialTheme.colorScheme.primary
 +            val schoolLine = buildAnnotatedString {
 +                append("I study at ")
 +                withStyle(
 +                    SpanStyle(
-+                        color = MaterialTheme.colorScheme.primary,
++                        color = accentColor,
 +                        fontWeight = FontWeight.Medium,
 +                        textDecoration = TextDecoration.Underline,
 +                    ),
@@ -1416,7 +1417,7 @@ index 0f03515e..1c7fac83 100644
                      startActivitySafely(context, intent)
                  },
              )
-@@ -3621,6 +3286,142 @@ private fun AboutCard(versionName: String) {
+@@ -3621,6 +3287,142 @@ private fun AboutCard(versionName: String) {
      }
  }
  
@@ -1439,7 +1440,7 @@ index 0f03515e..1c7fac83 100644
 +        val bitmap = Bitmap.createBitmap(matrix.width, matrix.height, Bitmap.Config.ARGB_8888)
 +        for (y in 0 until matrix.height) {
 +            for (x in 0 until matrix.width) {
-+                bitmap.setPixel(x, y, if (matrix[x, y]) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
++                bitmap.setPixel(x, y, if (matrix.get(x, y)) android.graphics.Color.BLACK else android.graphics.Color.WHITE)
 +            }
 +        }
 +        bitmap
@@ -1559,7 +1560,7 @@ index 0f03515e..1c7fac83 100644
  private fun openTelegramChannel(context: android.content.Context, handleOrUrl: String): Boolean {
      val username = handleOrUrl
          .removePrefix("https://t.me/")
-@@ -4344,7 +4145,7 @@ private fun YouTubeChannelSheet(
+@@ -4344,7 +4146,7 @@ private fun YouTubeChannelSheet(
                  Column(Modifier.weight(1f)) {
                      Text("YouTube Channel", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                      Text(
@@ -1568,7 +1569,7 @@ index 0f03515e..1c7fac83 100644
                          style = MaterialTheme.typography.bodySmall,
                          color = MaterialTheme.colorScheme.onSurfaceVariant,
                      )
-@@ -4506,7 +4307,7 @@ private fun YouTubeLibraryVisibilitySheet(
+@@ -4506,7 +4308,7 @@ private fun YouTubeLibraryVisibilitySheet(
                  Column(Modifier.weight(1f)) {
                      Text("YouTube Playlists Shown", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                      Text(
