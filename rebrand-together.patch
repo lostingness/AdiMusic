@@ -1579,7 +1579,7 @@ index 0f03515e..0e3ffd78 100644
                          color = MaterialTheme.colorScheme.onSurfaceVariant,
                      )
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
-index bd29df03..8d20c175 100644
+index bd29df03..a564ad15 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
 @@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Contrast
@@ -1775,12 +1775,10 @@ index bd29df03..8d20c175 100644
              // ==========================================
              // TAB: NOTIFICATION SCROBBLER
              // ==========================================
-@@ -1039,33 +862,17 @@ object SettingsSearchIndex {
-                     type = EntryType.ACTION,
-                 )
+@@ -1041,31 +864,13 @@ object SettingsSearchIndex {
              )
--            add(
--                SettingsEntry(
+             add(
+                 SettingsEntry(
 -                    id = "about.diagnostics",
 -                    title = "Export Diagnostics & Logs",
 -                    subtitle = "Export diagnostic report, crash logs, and hardware device info",
@@ -1795,10 +1793,9 @@ index bd29df03..8d20c175 100644
 -                    section = "About & Community",
 -                    type = EntryType.ACTION,
 -                )
-+            )
-             )
-             add(
-                 SettingsEntry(
+-            )
+-            add(
+-                SettingsEntry(
 -                    id = "about.check_updates",
 -                    title = "Check for Updates",
 -                    subtitle = "Check GitHub releases for the latest version and changelog",
