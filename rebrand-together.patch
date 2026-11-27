@@ -1,5 +1,5 @@
 diff --git a/README.md b/README.md
-index 945fdbd8..d0a1ee59 100644
+index 945fdbd..d0a1ee5 100644
 --- a/README.md
 +++ b/README.md
 @@ -1,160 +1,32 @@
@@ -184,7 +184,7 @@ index 945fdbd8..d0a1ee59 100644
 -
 -[![GitGem](https://gitgem.org/api/badge/github/Clash-Projects/LastWave-Native.svg)](https://gitgem.org/github/Clash-Projects/LastWave-Native)
 diff --git a/app/build.gradle.kts b/app/build.gradle.kts
-index 655dc416..6847c8db 100644
+index 655dc41..7b4edc2 100644
 --- a/app/build.gradle.kts
 +++ b/app/build.gradle.kts
 @@ -60,14 +60,21 @@ android {
@@ -193,8 +193,8 @@ index 655dc416..6847c8db 100644
          targetSdk = 35
 -        versionCode = 27
 -        versionName = "4.2.7"
-+        versionCode = 40
-+        versionName = "4.2.20"
++        versionCode = 41
++        versionName = "4.2.21"
  
          val lastWaveLyricsToken = resolveSecret("LASTWAVE_LYRICS_TOKEN")
          val lastWaveLyricsUrl = resolveSecret("LASTWAVE_LYRICS_URL")
@@ -220,7 +220,7 @@ index 655dc416..6847c8db 100644
      implementation(libs.androidx.core.ktx)
      implementation(libs.androidx.lifecycle.runtime.ktx)
 diff --git a/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt b/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
-index e69c2e47..38dfc7fa 100644
+index e69c2e4..38dfc7f 100644
 --- a/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
 +++ b/app/src/main/java/com/lastwave/app/data/local/SettingsPreferences.kt
 @@ -56,7 +56,7 @@ enum class LyricsAnimation(val id: String, val title: String, val description: S
@@ -233,7 +233,7 @@ index e69c2e47..38dfc7fa 100644
      BETTER_LYRICS("better_lyrics", "BetterLyrics", "Word-synced lyrics first"),
      KUGOU("kugou", "Kugou", "KRC word-synced lyrics first"),
 diff --git a/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt b/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt
-index bcbddd5b..96fb325c 100644
+index bcbddd5..96fb325 100644
 --- a/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt
 +++ b/app/src/main/java/com/lastwave/app/data/lyrics/LastWaveLyricsApi.kt
 @@ -149,7 +149,7 @@ class LastWaveLyricsApi @Inject constructor(
@@ -264,7 +264,7 @@ index bcbddd5b..96fb325c 100644
          }
  
 diff --git a/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt b/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt
-index 07ab7b82..dbe1731a 100644
+index 07ab7b8..dbe1731 100644
 --- a/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt
 +++ b/app/src/main/java/com/lastwave/app/data/music/InnerTubeMusicApi.kt
 @@ -1127,7 +1127,7 @@ class InnerTubeMusicApi @Inject constructor(
@@ -277,7 +277,7 @@ index 07ab7b82..dbe1731a 100644
          val root = runCatching {
              post(
 diff --git a/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt b/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt
-index 6b1c2bb0..890d6c7f 100644
+index 6b1c2bb..890d6c7 100644
 --- a/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt
 +++ b/app/src/main/java/com/lastwave/app/data/playlist/PlaylistRepository.kt
 @@ -386,7 +386,7 @@ class PlaylistRepository @Inject constructor(
@@ -298,8 +298,28 @@ index 6b1c2bb0..890d6c7f 100644
              mode = LIKED_SONGS_MODE,
              tracks = emptyList(),
          )
+diff --git a/app/src/main/java/com/lastwave/app/data/repository/HomeRepository.kt b/app/src/main/java/com/lastwave/app/data/repository/HomeRepository.kt
+index 1a1b2d0..f9b239c 100644
+--- a/app/src/main/java/com/lastwave/app/data/repository/HomeRepository.kt
++++ b/app/src/main/java/com/lastwave/app/data/repository/HomeRepository.kt
+@@ -498,8 +498,13 @@ class HomeRepository @Inject constructor(
+         val now = System.currentTimeMillis()
+         if (forceRefresh) {
+             cachedInitialData = null
+-        } else if (cachedInitialData?.first == cacheKey && (now - cachedInitialDataTimestamp < 30_000L)) {
+-            return Result.success(cachedInitialData!!.second)
++        } else {
++            // Capture once: a concurrent forceRefresh can null the var
++            // between the check and the read.
++            val cached = cachedInitialData
++            if (cached?.first == cacheKey && (now - cachedInitialDataTimestamp < 30_000L)) {
++                return Result.success(cached.second)
++            }
+         }
+ 
+         val deferred = inFlightInitialData.getOrPut(cacheKey) {
 diff --git a/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt b/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt
-index 748c1c38..01ba74e4 100644
+index 748c1c3..01ba74e 100644
 --- a/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt
 +++ b/app/src/main/java/com/lastwave/app/data/update/AppUpdateManager.kt
 @@ -57,9 +57,9 @@ class AppUpdateManager @Inject constructor(
@@ -324,7 +344,7 @@ index 748c1c38..01ba74e4 100644
          return
      }
 diff --git a/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt b/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt
-index 45ca44ff..1755938e 100644
+index 45ca44f..1755938 100644
 --- a/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt
 +++ b/app/src/main/java/com/lastwave/app/playback/MusicPlayer.kt
 @@ -134,7 +134,7 @@ internal data class PersistedPlaybackSession(
@@ -373,7 +393,7 @@ index 45ca44ff..1755938e 100644
      ) {
          disableRadioQueue()
 diff --git a/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt b/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt
-index 07760dc5..855d43b6 100644
+index 07760dc..855d43b 100644
 --- a/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/auth/AuthViewModel.kt
 @@ -92,10 +92,10 @@ class AuthViewModel @Inject constructor(
@@ -430,7 +450,7 @@ index 07760dc5..855d43b6 100644
                          is RestoreResult.Failed -> WebAuthState.Error(restoreResult.message)
                      }
 diff --git a/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt b/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt
-index b63f1409..b19a5694 100644
+index b63f140..b19a569 100644
 --- a/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/auth/LoginScreen.kt
 @@ -109,7 +109,7 @@ fun LoginScreen(
@@ -442,12 +462,143 @@ index b63f1409..b19a5694 100644
                  Text(
                      "Your music, your way — powered by YouTube Music",
                      style = MaterialTheme.typography.bodyMedium,
+diff --git a/app/src/main/java/com/lastwave/app/ui/common/ExpressiveHeader.kt b/app/src/main/java/com/lastwave/app/ui/common/ExpressiveHeader.kt
+index a8e0a52..7f8ccfb 100644
+--- a/app/src/main/java/com/lastwave/app/ui/common/ExpressiveHeader.kt
++++ b/app/src/main/java/com/lastwave/app/ui/common/ExpressiveHeader.kt
+@@ -184,8 +184,13 @@ fun HeaderActionIcon(
+     contentDescription: String?,
+     onClick: () -> Unit,
+ ) {
++    val interactionSource = androidx.compose.runtime.remember {
++        androidx.compose.foundation.interaction.MutableInteractionSource()
++    }
+     FilledTonalIconButton(
+         onClick = onClick,
++        interactionSource = interactionSource,
++        modifier = Modifier.pressScale(interactionSource, 0.86f),
+         colors = IconButtonDefaults.filledTonalIconButtonColors(
+             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+         ),
+diff --git a/app/src/main/java/com/lastwave/app/ui/common/ExpressiveMotion.kt b/app/src/main/java/com/lastwave/app/ui/common/ExpressiveMotion.kt
+index c4b1db6..cf2f359 100644
+--- a/app/src/main/java/com/lastwave/app/ui/common/ExpressiveMotion.kt
++++ b/app/src/main/java/com/lastwave/app/ui/common/ExpressiveMotion.kt
+@@ -19,10 +19,14 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
+ import androidx.compose.foundation.interaction.collectIsPressedAsState
+ import androidx.compose.material3.ripple
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Modifier
+-import androidx.compose.ui.draw.scale
++import androidx.compose.ui.graphics.graphicsLayer
++import kotlinx.coroutines.delay
+ 
+ /** Shared, restrained Material 3 Expressive motion language for the app. */
+ object ExpressiveMotion {
+@@ -89,35 +93,51 @@ object ExpressiveMotion {
+ }
+ 
+ /**
+- * Tactile spring press feedback modifier conforming to Material 3 Expressive.
+- * Subtly squishes the component when held and springs back dynamically on release.
++ * DochyMusic-style tactile press feedback: the component squishes with a
++ * snappy, slightly bouncy spring while held and springs back on release.
++ *
++ * The animated value is read inside [graphicsLayer], so pressing only
++ * redraws the layer — it never recomposes or re-lays-out the content.
++ * That keeps the bounce feeling identical on low-end phones without any
++ * scroll jank.
+  */
+ @Composable
+-fun Modifier.expressivePressScale(
++fun Modifier.pressScale(
+     interactionSource: MutableInteractionSource,
+-    targetScale: Float = 0.96f,
++    pressedScale: Float = 0.94f,
+ ): Modifier {
+     val isPressed by interactionSource.collectIsPressedAsState()
+-    val scale by animateFloatAsState(
+-        targetValue = if (isPressed) targetScale else 1f,
+-        animationSpec = ExpressiveMotion.spatialFast(),
+-        label = "expressivePressScale",
++    val scaleState = animateFloatAsState(
++        targetValue = if (isPressed) pressedScale else 1f,
++        animationSpec = spring(dampingRatio = 0.54f, stiffness = 720f),
++        label = "pressScale",
+     )
+-    return this.scale(scale)
++    return this.graphicsLayer {
++        val scale = scaleState.value
++        scaleX = scale
++        scaleY = scale
++    }
+ }
+ 
++/** Legacy name kept for existing call sites; same DochyMusic-style spring. */
++@Composable
++fun Modifier.expressivePressScale(
++    interactionSource: MutableInteractionSource,
++    targetScale: Float = 0.94f,
++): Modifier = pressScale(interactionSource, targetScale)
++
+ /**
+- * Clickable surface with expressive spring-based bounce feedback.
++ * Clickable surface with spring-based bounce feedback on press.
+  */
+ @Composable
+ fun Modifier.expressiveBounceClickable(
+     enabled: Boolean = true,
+-    targetScale: Float = 0.96f,
++    targetScale: Float = 0.94f,
+     onClick: () -> Unit,
+ ): Modifier {
+     val interactionSource = remember { MutableInteractionSource() }
+     return this
+-        .expressivePressScale(interactionSource, targetScale)
++        .pressScale(interactionSource, targetScale)
+         .clickable(
+             interactionSource = interactionSource,
+             indication = ripple(),
+@@ -125,3 +145,28 @@ fun Modifier.expressiveBounceClickable(
+             onClick = onClick,
+         )
+ }
++
++/**
++ * One-shot entrance: content fades in while rising a few pixels, with a
++ * small stagger per [index]. Runs once when the element first appears and
++ * then stays put, so lists do not re-animate while scrolling. Both values
++ * are read in [graphicsLayer], keeping it draw-phase only.
++ */
++@Composable
++fun Modifier.entrance(index: Int = 0): Modifier {
++    var shown by remember { mutableStateOf(false) }
++    LaunchedEffect(Unit) {
++        if (index > 0) delay((index * 45L).coerceAtMost(270L))
++        shown = true
++    }
++    val progressState = animateFloatAsState(
++        targetValue = if (shown) 1f else 0f,
++        animationSpec = spring(dampingRatio = 0.8f, stiffness = 380f),
++        label = "entrance",
++    )
++    return this.graphicsLayer {
++        val progress = progressState.value
++        alpha = progress
++        translationY = (1f - progress) * 24f
++    }
++}
 diff --git a/app/src/main/java/com/lastwave/app/ui/common/GlassButtons.kt b/app/src/main/java/com/lastwave/app/ui/common/GlassButtons.kt
 new file mode 100644
-index 00000000..49580a11
+index 0000000..70eb647
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/common/GlassButtons.kt
-@@ -0,0 +1,163 @@
+@@ -0,0 +1,173 @@
 +package com.lastwave.app.ui.common
 +
 +import androidx.compose.foundation.layout.PaddingValues
@@ -460,7 +611,9 @@ index 00000000..49580a11
 +import androidx.compose.material3.IconButton
 +import androidx.compose.material3.OutlinedButton
 +import androidx.compose.material3.TextButton
++import androidx.compose.foundation.interaction.MutableInteractionSource
 +import androidx.compose.runtime.Composable
++import androidx.compose.runtime.remember
 +import androidx.compose.ui.Modifier
 +import androidx.compose.ui.graphics.Shape
 +import androidx.compose.ui.unit.dp
@@ -511,9 +664,11 @@ index 00000000..49580a11
 +) {
 +    val glass = glassEnabled()
 +    val effectiveShape = shape ?: if (glass) GlassButtonShape else ButtonDefaults.shape
++    val interactionSource = remember { MutableInteractionSource() }
 +    Button(
 +        onClick = onClick,
-+        modifier = modifier.liquidGlassChrome(
++        interactionSource = interactionSource,
++        modifier = modifier.pressScale(interactionSource, 0.95f).liquidGlassChrome(
 +            effectiveShape,
 +            glass,
 +            LiquidGlassPreset.FloatingControls,
@@ -542,9 +697,11 @@ index 00000000..49580a11
 +) {
 +    val glass = glassEnabled()
 +    val effectiveShape = shape ?: if (glass) GlassButtonShape else ButtonDefaults.outlinedShape
++    val interactionSource = remember { MutableInteractionSource() }
 +    OutlinedButton(
 +        onClick = onClick,
-+        modifier = modifier.liquidGlassChrome(
++        interactionSource = interactionSource,
++        modifier = modifier.pressScale(interactionSource, 0.95f).liquidGlassChrome(
 +            effectiveShape,
 +            glass,
 +            LiquidGlassPreset.FloatingControls,
@@ -573,9 +730,11 @@ index 00000000..49580a11
 +) {
 +    val glass = glassEnabled()
 +    val effectiveShape = shape ?: if (glass) GlassButtonShape else ButtonDefaults.textShape
++    val interactionSource = remember { MutableInteractionSource() }
 +    TextButton(
 +        onClick = onClick,
-+        modifier = modifier.liquidGlassChrome(
++        interactionSource = interactionSource,
++        modifier = modifier.pressScale(interactionSource, 0.95f).liquidGlassChrome(
 +            effectiveShape,
 +            glass,
 +            LiquidGlassPreset.FloatingControls,
@@ -600,9 +759,11 @@ index 00000000..49580a11
 +    content: @Composable () -> Unit,
 +) {
 +    val glass = glassEnabled()
++    val interactionSource = remember { MutableInteractionSource() }
 +    IconButton(
 +        onClick = onClick,
-+        modifier = modifier.liquidGlassChrome(
++        interactionSource = interactionSource,
++        modifier = modifier.pressScale(interactionSource, 0.86f).liquidGlassChrome(
 +            CircleShape,
 +            glass,
 +            LiquidGlassPreset.FloatingControls,
@@ -612,7 +773,7 @@ index 00000000..49580a11
 +    )
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt b/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt
-index 6ac6d59b..cc7a22e5 100644
+index 6ac6d59..8413968 100644
 --- a/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/common/OverflowMenuButton.kt
 @@ -15,6 +15,12 @@ import androidx.compose.runtime.Composable
@@ -628,7 +789,7 @@ index 6ac6d59b..cc7a22e5 100644
  
  
  /**
-@@ -34,6 +40,11 @@ import androidx.compose.ui.unit.dp
+@@ -34,19 +40,34 @@ import androidx.compose.ui.unit.dp
   */
  @Composable
  fun OverflowMenuButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -640,8 +801,14 @@ index 6ac6d59b..cc7a22e5 100644
      val darkThemeTone = lerp(
          MaterialTheme.colorScheme.surfaceContainerHigh,
          MaterialTheme.colorScheme.primaryContainer,
-@@ -43,10 +54,15 @@ fun OverflowMenuButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+         0.55f,
+     )
++    val interactionSource = androidx.compose.runtime.remember {
++        androidx.compose.foundation.interaction.MutableInteractionSource()
++    }
+     FilledTonalIconButton(
          onClick = onClick,
++        interactionSource = interactionSource,
          shape = RoundedCornerShape(12.dp),
          colors = IconButtonDefaults.filledTonalIconButtonColors(
 -            containerColor = darkThemeTone,
@@ -649,6 +816,7 @@ index 6ac6d59b..cc7a22e5 100644
              contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
          ),
          modifier = modifier
++            .pressScale(interactionSource, 0.86f)
 +            .liquidGlassChrome(
 +                RoundedCornerShape(12.dp),
 +                glass,
@@ -658,7 +826,7 @@ index 6ac6d59b..cc7a22e5 100644
              .width(26.dp)
              .height(32.dp),
 diff --git a/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt b/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt
-index 650d1987..5b278939 100644
+index 650d198..28ad3c1 100644
 --- a/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/common/TrackContextMenuSheet.kt
 @@ -281,7 +281,7 @@ fun TrackContextMenuSheet(
@@ -670,8 +838,23 @@ index 650d1987..5b278939 100644
      onPlayInLastWave: (() -> Unit)? = null,
      onStartMix: ((trackName: String, artistName: String) -> Unit)? = null,
      onExploreGenre: ((genre: String) -> Unit)? = null,
+@@ -593,6 +593,14 @@ fun TrackContextMenuSheet(
+                             }
+                         }
+                     }
++                    if (capabilities.showDeleteScrobble && onDeleteScrobble != null) {
++                        add { pos ->
++                            MenuActionRow(Icons.Filled.Delete, "Delete Scrobble", danger = true, position = pos) {
++                                onDeleteScrobble(t.name, t.artist)
++                                onDismiss()
++                            }
++                        }
++                    }
+                 }
+                 ExpressiveGroup(rowCount = rows.size) { index, position -> rows[index](position) }
+             } else if (target is TrackMenuTarget.Artist) {
 diff --git a/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt b/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt
-index 1a55d93e..b9a1334b 100644
+index 1a55d93..b9a1334 100644
 --- a/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/common/TrackMiniTraySheet.kt
 @@ -74,7 +74,7 @@ data class TrackMiniTrayData(
@@ -683,11 +866,95 @@ index 1a55d93e..b9a1334b 100644
      val onPlay: (() -> Unit)? = null,
  ) {
      fun toPlayable(): PlayableTrack = PlayableTrack(
+diff --git a/app/src/main/java/com/lastwave/app/ui/feed/FeedScreen.kt b/app/src/main/java/com/lastwave/app/ui/feed/FeedScreen.kt
+index 040d960..fc661c3 100644
+--- a/app/src/main/java/com/lastwave/app/ui/feed/FeedScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/feed/FeedScreen.kt
+@@ -131,6 +131,7 @@ import com.lastwave.app.ui.navigation.ArtistAlbumNavigator
+ import com.lastwave.app.ui.player.LocalMusicPlayer
+ import com.lastwave.app.ui.player.PlayingWaveBars
+ import com.lastwave.app.ui.shell.FloatingNavDefaults
++import com.lastwave.app.ui.common.pressScale
+ 
+ 
+ @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@@ -694,7 +695,7 @@ fun FeedScreen(
+                             )
+                             FeedMediaRow(
+                                 content = {
+-                                    items(state.feedData.recentAlbums) { album ->
++                                    items(state.feedData.recentAlbums, key = { "album_${it.artist}_${it.title}" }) { album ->
+                                         FeedMediaCard(
+                                             title = album.title,
+                                             subtitle = ArtistHelper.primaryArtist(album.artist),
+@@ -780,7 +781,7 @@ fun FeedScreen(
+                             )
+                             FeedMediaRow(
+                                 content = {
+-                                    items(state.feedData.newReleases) { summary ->
++                                    items(state.feedData.newReleases, key = { "release_${it.author.orEmpty()}_${it.title}" }) { summary ->
+                                         FeedMediaCard(
+                                             title = summary.title,
+                                             subtitle = summary.author?.let(ArtistHelper::primaryArtist) ?: "Album",
+@@ -824,7 +825,7 @@ fun FeedScreen(
+                                 horizontalArrangement = Arrangement.spacedBy(14.dp),
+                                 modifier = Modifier.padding(top = 12.dp),
+                             ) {
+-                                items(state.feedData.friends) { friend ->
++                                items(state.feedData.friends, key = { "friend_${it.name}" }) { friend ->
+                                     FriendAvatarCard(
+                                         friend = friend,
+                                         onClick = {
+@@ -1205,7 +1206,7 @@ private fun QuickTilesGrid(
+         contentPadding = PaddingValues(horizontal = 16.dp),
+         horizontalArrangement = Arrangement.spacedBy(10.dp),
+     ) {
+-        items(tiles) { tile ->
++        items(tiles, key = { "tile_${it.title}" }) { tile ->
+             QuickTileCard(
+                 tile = tile,
+                 onClick = { onTileClick(tile) },
+@@ -1509,11 +1510,13 @@ private fun FeedMediaCard(
+     cardWidth: androidx.compose.ui.unit.Dp = 148.dp,
+ ) {
+     val haptics = LocalHapticFeedback.current
++    val cardInteractionSource = remember { MutableInteractionSource() }
+     Column(
+         modifier = Modifier
+             .width(cardWidth)
++            .pressScale(cardInteractionSource, 0.95f)
+             .combinedClickable(
+-                interactionSource = remember { MutableInteractionSource() },
++                interactionSource = cardInteractionSource,
+                 indication = null,
+                 onLongClick = onLongClick,
+                 onClick = {
+diff --git a/app/src/main/java/com/lastwave/app/ui/genres/GenresScreen.kt b/app/src/main/java/com/lastwave/app/ui/genres/GenresScreen.kt
+index 7c1344c..2ca9e42 100644
+--- a/app/src/main/java/com/lastwave/app/ui/genres/GenresScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/genres/GenresScreen.kt
+@@ -58,6 +58,7 @@ import com.lastwave.app.ui.common.safeDrawingBottomPadding
+ import com.lastwave.app.ui.common.safeHorizontalContentPadding
+ import com.lastwave.app.ui.common.adaptiveContentWidth
+ import com.lastwave.app.ui.player.LocalMiniPlayerScrollClearance
++import com.lastwave.app.ui.common.expressiveBounceClickable
+ 
+ /**
+  * Faithful port of genres.js (§5): bar-chart genre list with a period
+@@ -176,7 +177,7 @@ private fun GenreBarRow(
+     modifier: Modifier = Modifier,
+ ) {
+     val animated by animateFloatAsState(targetValue = percent.coerceIn(0.03f, 1f), animationSpec = tween(600), label = "genreBar")
+-    Column(modifier.fillMaxWidth().clickable(onClick = onClick)) {
++    Column(modifier.fillMaxWidth().expressiveBounceClickable(targetScale = 0.97f, onClick = onClick)) {
+         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+             Text(name.replaceFirstChar { it.uppercase() }, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+             Text("${(percent * 100).toInt()}%", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
 diff --git a/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt b/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt
-index 26c6fcc2..7f52206d 100644
+index 26c6fcc..7b2cfb8 100644
 --- a/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/home/HomeScreen.kt
-@@ -56,13 +56,15 @@ import androidx.compose.material3.DropdownMenu
+@@ -56,14 +56,19 @@ import androidx.compose.material3.DropdownMenu
  import androidx.compose.material3.DropdownMenuItem
  import androidx.compose.material3.ExperimentalMaterial3Api
  import androidx.compose.material3.Icon
@@ -702,10 +969,17 @@ index 26c6fcc2..7f52206d 100644
 +import com.lastwave.app.ui.common.GlassIconButton
 +import com.lastwave.app.ui.common.GlassOutlinedButton
  import com.lastwave.app.ui.common.HeaderActionIcon
++import com.lastwave.app.ui.common.entrance
++import com.lastwave.app.ui.common.pressScale
++import com.lastwave.app.ui.common.expressiveBounceClickable
  import com.lastwave.app.ui.common.safeHorizontalContentPadding
  import com.lastwave.app.ui.common.adaptiveContentWidth
-@@ -191,7 +193,7 @@ fun HomeScreen(
+ import com.lastwave.app.ui.common.TrackContextMenuSheet
+@@ -189,9 +194,10 @@ fun HomeScreen(
+                     title = "Statistics",
+                     modifier = Modifier.adaptiveContentWidth(maxWidth = 860.dp),
                      actions = {
++                        HeaderActionIcon(Icons.Filled.Explore, "Discover", onOpenDiscover)
                          HeaderActionIcon(Icons.Filled.Download, "Downloads", onOpenDownloads)
                          HeaderActionIcon(Icons.Filled.Search, "Search", onOpenSearch)
 -                        IconButton(onClick = onOpenSettings) {
@@ -713,16 +987,297 @@ index 26c6fcc2..7f52206d 100644
                              ProfileAvatar(avatarUrl = uiState.stats?.avatarUrl, modifier = Modifier.size(38.dp))
                          }
                      },
-@@ -790,7 +792,7 @@ private fun StatsCard(
-                             modifier = Modifier.size(46.dp).align(Alignment.CenterEnd),
+@@ -260,7 +266,7 @@ fun HomeScreen(
+                 modifier = Modifier.weight(1f).fillMaxWidth(),
+             ) {
+                 val listState = rememberLazyListState()
+-                LaunchedEffect(listState, uiState.allTracks.size) {
++                LaunchedEffect(listState) {
+                     snapshotFlowNearEnd(listState) { viewModel.loadNextPage() }
+                 }
+ 
+@@ -291,6 +297,32 @@ fun HomeScreen(
+                 // the 3-dot button keeps opening the full menu sheet.
+                 var miniTrayRowIndex by remember { mutableStateOf<Int?>(null) }
+ 
++                uiState.error?.let { errorMessage ->
++                    Surface(
++                        shape = TrackRowShape,
++                        color = MaterialTheme.colorScheme.errorContainer,
++                        modifier = Modifier
++                            .fillMaxWidth()
++                            .padding(horizontal = 16.dp, vertical = 6.dp),
++                    ) {
++                        Row(
++                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
++                            verticalAlignment = Alignment.CenterVertically,
++                        ) {
++                            Text(
++                                errorMessage,
++                                style = MaterialTheme.typography.bodyMedium,
++                                color = MaterialTheme.colorScheme.onErrorContainer,
++                                modifier = Modifier.weight(1f),
++                            )
++                            Spacer(Modifier.width(10.dp))
++                            GlassButton(onClick = { viewModel.refresh() }) {
++                                Text("Retry")
++                            }
++                        }
++                    }
++                }
++
+                 Column(
+                     Modifier
+                         .fillMaxSize()
+@@ -312,6 +344,23 @@ fun HomeScreen(
+                         ),
+                         modifier = Modifier.fillMaxSize(),
+                     ) {
++                        if (uiState.topArtists.isNotEmpty() || uiState.topAlbums.isNotEmpty() || uiState.topTags.isNotEmpty()) {
++                            item(key = "podium", contentType = "podium") {
++                                PodiumSection(
++                                    artists = uiState.topArtists,
++                                    albums = uiState.topAlbums,
++                                    tags = uiState.topTags,
++                                    onArtistClick = { artist ->
++                                        artistAlbumNavigator.openArtist(name = artist.name, browseId = "")
++                                    },
++                                    onAlbumClick = { album ->
++                                        artistAlbumNavigator.openAlbum(title = album.name, artist = album.artist, browseId = "")
++                                    },
++                                    onTagClick = { onOpenGenres() },
++                                    modifier = Modifier.padding(vertical = 10.dp),
++                                )
++                            }
++                        }
+                         itemsIndexed(
+                             rows,
+                             key = { _, row ->
+@@ -378,11 +427,36 @@ fun HomeScreen(
+ 
+                         if (rows.isEmpty()) {
+                             item(key = "empty", contentType = "empty") {
+-                                Box(
+-                                    Modifier.fillMaxWidth().padding(vertical = 48.dp),
+-                                    contentAlignment = Alignment.Center,
++                                Column(
++                                    Modifier.fillMaxWidth().entrance(2).padding(vertical = 48.dp),
++                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                 ) {
+-                                    Text("No tracks yet", color = MaterialTheme.colorScheme.onSurfaceVariant)
++                                    Surface(
++                                        shape = CircleShape,
++                                        color = MaterialTheme.colorScheme.surfaceContainerHigh,
++                                        modifier = Modifier.size(72.dp),
++                                    ) {
++                                        Box(contentAlignment = Alignment.Center) {
++                                            Icon(
++                                                Icons.Filled.MusicNote,
++                                                contentDescription = null,
++                                                modifier = Modifier.size(34.dp),
++                                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
++                                            )
++                                        }
++                                    }
++                                    Spacer(Modifier.height(14.dp))
++                                    Text(
++                                        "No tracks yet",
++                                        style = MaterialTheme.typography.titleMedium,
++                                        fontWeight = FontWeight.SemiBold,
++                                    )
++                                    Spacer(Modifier.height(4.dp))
++                                    Text(
++                                        "Play something and your history will show up here.",
++                                        style = MaterialTheme.typography.bodyMedium,
++                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
++                                    )
+                                 }
+                             }
+                         }
+@@ -442,12 +516,17 @@ private fun HeaderRow(
+     viewModel: HomeViewModel,
+ ) {
+     Row(
+-        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 2.dp),
++        modifier = Modifier.fillMaxWidth().entrance(0).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 2.dp),
+         verticalAlignment = Alignment.CenterVertically,
+         horizontalArrangement = Arrangement.SpaceBetween,
+     ) {
++        val chipInteractionSource = remember {
++            androidx.compose.foundation.interaction.MutableInteractionSource()
++        }
+         Surface(
+             onClick = onClick,
++            interactionSource = chipInteractionSource,
++            modifier = Modifier.pressScale(chipInteractionSource, 0.92f),
+             shape = BadgePillShape,
+             color = if (isViewingFriend) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainerHigh,
+         ) {
+@@ -479,7 +558,16 @@ private fun HeaderRow(
+ 
+ @Composable
+ private fun LiveListenTimer(viewModel: HomeViewModel) {
+-    val uiState by viewModel.uiState.collectAsStateWithLifecycle()
++    // Only stats + nowPlaying matter here; collecting the whole uiState
++    // recomposed this chip on every poll tick.
++    val timerInputs by remember(viewModel) {
++        viewModel.uiState
++            .map { it.stats to it.nowPlaying }
++            .distinctUntilChanged()
++    }.collectAsStateWithLifecycle(initialValue = null to null)
++    val uiState = remember(timerInputs) {
++        HomeUiState(stats = timerInputs.first, nowPlaying = timerInputs.second)
++    }
+     val listenElapsedSeconds by viewModel.listenElapsedSeconds.collectAsStateWithLifecycle()
+     val totalSeconds = (uiState.stats?.timerBaseSeconds ?: 0) + listenElapsedSeconds.toLong()
+     val isPlaying = uiState.nowPlaying != null
+@@ -596,6 +684,9 @@ private fun PodiumSection(
+     artists: List<HomeArtistItem>,
+     albums: List<HomeAlbum>,
+     tags: List<String>,
++    onArtistClick: (HomeArtistItem) -> Unit = {},
++    onAlbumClick: (HomeAlbum) -> Unit = {},
++    onTagClick: (String) -> Unit = {},
+     modifier: Modifier = Modifier,
+ ) {
+     Column(modifier = modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+@@ -606,7 +697,7 @@ private fun PodiumSection(
+                 contentPadding = PaddingValues(horizontal = 2.dp),
+             ) {
+                 items(artists, key = { "artist_${it.name.lowercase()}" }) { artist ->
+-                    ArtistPodiumCard(artist)
++                    ArtistPodiumCard(artist, onClick = { onArtistClick(artist) })
+                 }
+             }
+         }
+@@ -617,7 +708,7 @@ private fun PodiumSection(
+                 contentPadding = PaddingValues(horizontal = 2.dp),
+             ) {
+                 items(albums, key = { "album_${it.artist.lowercase()}_${it.name.lowercase()}" }) { album ->
+-                    AlbumPodiumCard(album)
++                    AlbumPodiumCard(album, onClick = { onAlbumClick(album) })
+                 }
+             }
+         }
+@@ -629,6 +720,7 @@ private fun PodiumSection(
+             ) {
+                 items(tags, key = { "tag_$it" }) { tag ->
+                     Surface(
++                        onClick = { onTagClick(tag) },
+                         shape = BadgePillShape,
+                         color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                     ) {
+@@ -660,9 +752,9 @@ private fun formatPlays(count: Long): String =
+     if (count >= 1000) "%.1fk plays".format(count / 1000.0) else "$count plays"
+ 
+ @Composable
+-private fun ArtistPodiumCard(artist: HomeArtistItem) {
++private fun ArtistPodiumCard(artist: HomeArtistItem, onClick: () -> Unit = {}) {
+     Column(
+-        modifier = Modifier.width(84.dp),
++        modifier = Modifier.width(84.dp).expressiveBounceClickable(targetScale = 0.94f, onClick = onClick),
+         horizontalAlignment = Alignment.CenterHorizontally,
+     ) {
+         Box(
+@@ -699,9 +791,9 @@ private fun ArtistPodiumCard(artist: HomeArtistItem) {
+ }
+ 
+ @Composable
+-private fun AlbumPodiumCard(album: HomeAlbum) {
++private fun AlbumPodiumCard(album: HomeAlbum, onClick: () -> Unit = {}) {
+     Column(
+-        modifier = Modifier.width(96.dp),
++        modifier = Modifier.width(96.dp).expressiveBounceClickable(targetScale = 0.94f, onClick = onClick),
+         horizontalAlignment = Alignment.CenterHorizontally,
+     ) {
+         Box(
+@@ -785,18 +877,28 @@ private fun StatsCard(
+                             )
+                         }
+                         Surface(
++                            onClick = onOpenGenres,
+                             shape = ExpressivePillShape,
+                             color = MaterialTheme.colorScheme.primary,
+-                            modifier = Modifier.size(46.dp).align(Alignment.CenterEnd),
++                            modifier = Modifier.align(Alignment.CenterEnd),
                          ) {
-                             Box(contentAlignment = Alignment.Center) {
+-                            Box(contentAlignment = Alignment.Center) {
 -                                IconButton(onClick = onOpenGenres) {
-+                                GlassIconButton(onClick = onOpenGenres) {
-                                     Icon(
-                                         Icons.AutoMirrored.Filled.ArrowForward,
-                                         contentDescription = "View genres",
-@@ -1247,7 +1249,7 @@ private fun HomeNowPlayingBanner(
+-                                    Icon(
+-                                        Icons.AutoMirrored.Filled.ArrowForward,
+-                                        contentDescription = "View genres",
+-                                        tint = MaterialTheme.colorScheme.onPrimary,
+-                                    )
+-                                }
++                            Row(
++                                verticalAlignment = Alignment.CenterVertically,
++                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
++                            ) {
++                                Text(
++                                    "Genres",
++                                    style = MaterialTheme.typography.labelMedium,
++                                    fontWeight = FontWeight.Bold,
++                                    color = MaterialTheme.colorScheme.onPrimary,
++                                )
++                                Spacer(Modifier.width(4.dp))
++                                Icon(
++                                    Icons.AutoMirrored.Filled.ArrowForward,
++                                    contentDescription = "View genres",
++                                    tint = MaterialTheme.colorScheme.onPrimary,
++                                    modifier = Modifier.size(16.dp),
++                                )
+                             }
+                         }
+                     }
+@@ -1051,10 +1153,14 @@ private fun TrackRow(
+     val secondaryTextColor =
+         if (isNowPlaying) MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
+         else MaterialTheme.colorScheme.onSurfaceVariant
++    val rowInteractionSource = remember {
++        androidx.compose.foundation.interaction.MutableInteractionSource()
++    }
+     val cardModifier = if (isNowPlaying) {
+         Modifier
+             .fillMaxWidth()
+             .padding(vertical = 4.dp)
++            .pressScale(rowInteractionSource, 0.97f)
+             .clip(NowPlayingCardShape)
+             .background(
+                 Brush.horizontalGradient(
+@@ -1064,11 +1170,22 @@ private fun TrackRow(
+                     ),
+                 ),
+             )
+-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
++            .combinedClickable(
++                interactionSource = rowInteractionSource,
++                indication = androidx.compose.material3.ripple(),
++                onClick = onClick,
++                onLongClick = onLongClick,
++            )
+     } else {
+         Modifier
+             .fillMaxWidth()
+-            .combinedClickable(onClick = onClick, onLongClick = onLongClick)
++            .pressScale(rowInteractionSource, 0.97f)
++            .combinedClickable(
++                interactionSource = rowInteractionSource,
++                indication = androidx.compose.material3.ripple(),
++                onClick = onClick,
++                onLongClick = onLongClick,
++            )
+     }
+ 
+     Surface(
+@@ -1095,6 +1212,7 @@ private fun TrackRow(
+                     artist = com.lastwave.app.util.ArtistHelper.primaryArtist(track.artist),
+                     embeddedUrl = track.artworkUrl,
+                     fallbackIcon = if (isNowPlaying) Icons.Filled.GraphicEq else Icons.Filled.MusicNote,
++                    decodeSizePx = 256,
+                     modifier = Modifier.fillMaxSize(),
+                 )
+                 if (isNowPlaying) {
+@@ -1247,7 +1365,7 @@ private fun HomeNowPlayingBanner(
                          )
                      }
                  }
@@ -731,7 +1286,7 @@ index 26c6fcc2..7f52206d 100644
                      Icon(
                          Icons.Filled.MoreVert,
                          contentDescription = "Menu",
-@@ -1303,7 +1305,7 @@ private fun HomeNowPlayingBanner(
+@@ -1303,7 +1421,7 @@ private fun HomeNowPlayingBanner(
                  modifier = Modifier.fillMaxWidth(),
                  horizontalArrangement = Arrangement.spacedBy(8.dp),
              ) {
@@ -740,7 +1295,7 @@ index 26c6fcc2..7f52206d 100644
                      onClick = onPlay,
                      modifier = Modifier.weight(1f).height(38.dp),
                      colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-@@ -1314,7 +1316,7 @@ private fun HomeNowPlayingBanner(
+@@ -1314,7 +1432,7 @@ private fun HomeNowPlayingBanner(
                      Spacer(Modifier.width(6.dp))
                      Text("Play", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                  }
@@ -749,19 +1304,97 @@ index 26c6fcc2..7f52206d 100644
                      onClick = onStartMix,
                      modifier = Modifier.weight(1f).height(38.dp),
                      shape = BadgePillShape,
+@@ -1339,7 +1457,7 @@ private fun AlbumRow(
+     Surface(
+         shape = TrackRowShape,
+         color = Color.Transparent,
+-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
++        modifier = Modifier.fillMaxWidth().expressiveBounceClickable(targetScale = 0.97f, onClick = onClick)
+     ) {
+         Row(
+             modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = 6.dp, horizontal = 8.dp),
+@@ -1353,6 +1471,7 @@ private fun AlbumRow(
+                     artist = album.artist,
+                     embeddedUrl = album.artworkUrl,
+                     fallbackIcon = Icons.Filled.Album,
++                    decodeSizePx = 256,
+                     modifier = Modifier.fillMaxSize(),
+                 )
+             }
+@@ -1391,7 +1510,7 @@ private fun ArtistRow(
+     Surface(
+         shape = TrackRowShape,
+         color = Color.Transparent,
+-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
++        modifier = Modifier.fillMaxWidth().expressiveBounceClickable(targetScale = 0.97f, onClick = onClick)
+     ) {
+         Row(
+             modifier = Modifier.fillMaxWidth().heightIn(min = 64.dp).padding(vertical = 6.dp, horizontal = 8.dp),
+@@ -1405,6 +1524,7 @@ private fun ArtistRow(
+                     artist = artist.name,
+                     embeddedUrl = artist.artworkUrl,
+                     fallbackIcon = Icons.Filled.People,
++                    decodeSizePx = 256,
+                     modifier = Modifier.fillMaxSize(),
+                 )
+             }
+diff --git a/app/src/main/java/com/lastwave/app/ui/home/HomeViewModel.kt b/app/src/main/java/com/lastwave/app/ui/home/HomeViewModel.kt
+index a89a66e..16c7d31 100644
+--- a/app/src/main/java/com/lastwave/app/ui/home/HomeViewModel.kt
++++ b/app/src/main/java/com/lastwave/app/ui/home/HomeViewModel.kt
+@@ -59,7 +59,6 @@ data class HomeUiState(
+     val error: String? = null,
+     val friends: List<FriendEntry> = emptyList(),
+     val isLoadingFriends: Boolean = false,
+-    val showFriendsSheet: Boolean = false,
+     val pinnedFriends: Set<String> = emptySet(),
+     /**
+      * True when Last.fm is NOT connected and Stats runs in Local Stats Mode
+@@ -672,7 +671,8 @@ class HomeViewModel @Inject constructor(
+     /** Opens the friend-switcher sheet — lazily loads the signed-in user's
+      *  own friends list (user.getfriends) the first time it's opened. */
+     fun openFriendsSheet() {
+-        _uiState.update { it.copy(showFriendsSheet = true) }
++        // Load trigger only — the friend switcher is its own screen now,
++        // so there is no sheet visibility flag to flip.
+         if (_uiState.value.friends.isEmpty()) {
+             viewModelScope.launch(Dispatchers.IO) {
+                 _uiState.update { it.copy(isLoadingFriends = true) }
+@@ -684,10 +684,6 @@ class HomeViewModel @Inject constructor(
+         }
+     }
+ 
+-    fun dismissFriendsSheet() {
+-        _uiState.update { it.copy(showFriendsSheet = false) }
+-    }
+-
+     fun toggleFriendPinned(username: String) {
+         viewModelScope.launch { settingsPreferences.toggleFriendPinned(username) }
+     }
+@@ -696,7 +692,6 @@ class HomeViewModel @Inject constructor(
+      *  fetch (recent tracks, stats, top tracks for every period) re-runs
+      *  for [friend]'s username instead of the signed-in one. */
+     fun viewFriend(friend: FriendEntry) {
+-        _uiState.update { it.copy(showFriendsSheet = false) }
+         viewingProfileState.set(friend.name)
+         loadForUsername(friend.name)
+     }
 diff --git a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
-index 21d4f350..62255ef9 100644
+index 21d4f35..c88a560 100644
 --- a/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/navigation/NavGraph.kt
-@@ -399,7 +399,6 @@ fun LastWaveNavHost(
+@@ -399,9 +399,9 @@ fun LastWaveNavHost(
                          }
                      },
                      onOpenDownloads = { navController.navigate(Screen.Downloads.route) },
 -                    onOpenModules = { navController.navigate(Screen.ProviderModules.route) },
                      onOpenHomeSections = { navController.navigate(Screen.HomeSections.route) },
                      onOpenExcludedSongs = { navController.navigate(Screen.ExcludedSongs.route) },
++                    onOpenModules = { navController.navigate(Screen.ProviderModules.route) },
                      onOpenYouTubeImport = { navController.navigate(Screen.YouTubeImport.route) },
-@@ -446,12 +445,6 @@ fun LastWaveNavHost(
+                     onOpenYouTubeLogin = { navController.navigate(Screen.YouTubeLogin.route) },
+                     onOpenExternalImport = { navController.navigate(Screen.ExternalPlaylistImport.route) },
+@@ -446,12 +446,6 @@ fun LastWaveNavHost(
              }
          }
  
@@ -774,7 +1407,20 @@ index 21d4f350..62255ef9 100644
          composable(Screen.HomeSections.route) {
              PredictiveBackScreen(onBack = { navController.popBackStack() }) {
                  com.lastwave.app.ui.settings.HomeSectionsScreen(onBack = { navController.popBackStack() })
-@@ -613,7 +606,7 @@ private fun LaunchGate() {
+@@ -464,6 +458,12 @@ fun LastWaveNavHost(
+             }
+         }
+ 
++        composable(Screen.ProviderModules.route) {
++            PredictiveBackScreen(onBack = { navController.popBackStack() }) {
++                com.lastwave.app.ui.settings.ModulesScreen(onBack = { navController.popBackStack() })
++            }
++        }
++
+ 
+         composable(Screen.Search.route) {
+             PredictiveBackScreen(onBack = { navController.popBackStack() }) {
+@@ -613,7 +613,7 @@ private fun LaunchGate() {
                  )
              }
              Spacer(Modifier.height(18.dp))
@@ -783,11 +1429,32 @@ index 21d4f350..62255ef9 100644
              Spacer(Modifier.height(20.dp))
              ExpressiveLoadingIndicator(message = "Preparing your music")
          }
+diff --git a/app/src/main/java/com/lastwave/app/ui/player/CanvasArtworkPlayer.kt b/app/src/main/java/com/lastwave/app/ui/player/CanvasArtworkPlayer.kt
+index 96cb6d6..62642a9 100644
+--- a/app/src/main/java/com/lastwave/app/ui/player/CanvasArtworkPlayer.kt
++++ b/app/src/main/java/com/lastwave/app/ui/player/CanvasArtworkPlayer.kt
+@@ -305,7 +305,7 @@ fun CanvasArtworkPlayer(
+             }
+         },
+         update = { frame ->
+-            val view = frame.getChildAt(0) as TextureView
++            val view = frame.getChildAt(0) as? TextureView ?: return@AndroidView
+             view.alpha = if (contentMode == CanvasContentMode.FIT_PORTRAIT && clipAspect <= 0f) {
+                 0f
+             } else {
 diff --git a/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt b/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
-index 8b0c1c2a..1d7a3237 100644
+index 8b0c1c2..995e95e 100644
 --- a/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/player/PlayerHost.kt
-@@ -2164,7 +2164,7 @@ private fun FullPlayer(
+@@ -256,6 +256,7 @@ import com.lastwave.app.ui.theme.LocalLiquidGlassOverlayBackdrop
+ import com.lastwave.app.ui.theme.LiquidGlassPreset
+ import com.lastwave.app.ui.theme.Backdrop
+ import com.lastwave.app.ui.theme.rememberLayerBackdrop
++import com.lastwave.app.ui.common.expressiveBounceClickable
+ import android.graphics.Bitmap
+ import androidx.compose.animation.core.Animatable
+ import androidx.compose.animation.core.tween
+@@ -2164,7 +2165,7 @@ private fun FullPlayer(
                              if (currentTab == FullPlayerTab.LYRICS) {
                                  "${track.title} • ${track.artist}"
                              } else {
@@ -796,7 +1463,7 @@ index 8b0c1c2a..1d7a3237 100644
                              },
                              style = MaterialTheme.typography.bodySmall,
                              color = Color.White.copy(alpha = 0.70f),
-@@ -2674,7 +2674,7 @@ private fun FullPlayer(
+@@ -2674,7 +2675,7 @@ private fun FullPlayer(
                                                  ),
                                                  label = "likeScale",
                                              )
@@ -805,8 +1472,102 @@ index 8b0c1c2a..1d7a3237 100644
                                              // alone never fired reliably through the glass surface, so the
                                              // heart now visibly pops whenever the liked state flips.
                                              val likePop = remember { Animatable(1f) }
+@@ -3603,7 +3604,7 @@ private fun QueuePanel(state: MusicPlayerState, player: MusicPlayer, modifier: M
+                         modifier = Modifier
+                             .fillMaxWidth()
+                             .clip(RoundedCornerShape(12.dp))
+-                            .clickable { player.seekToQueueItem(queueIndex) }
++                            .expressiveBounceClickable(targetScale = 0.97f) { player.seekToQueueItem(queueIndex) }
+                             .padding(horizontal = 4.dp, vertical = 5.dp),
+                         verticalAlignment = Alignment.CenterVertically,
+                     ) {
+diff --git a/app/src/main/java/com/lastwave/app/ui/playlist/PlaylistDetailScreen.kt b/app/src/main/java/com/lastwave/app/ui/playlist/PlaylistDetailScreen.kt
+index 05a4771..1f14fd6 100644
+--- a/app/src/main/java/com/lastwave/app/ui/playlist/PlaylistDetailScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/playlist/PlaylistDetailScreen.kt
+@@ -1318,8 +1318,8 @@ private fun NativeTrackRow(
+     val interactionSource = remember { MutableInteractionSource() }
+     val isPressed by interactionSource.collectIsPressedAsState()
+     val rowScale by animateFloatAsState(
+-        targetValue = if (isPressed) 0.98f else 1f,
+-        animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
++        targetValue = if (isPressed) 0.97f else 1f,
++        animationSpec = spring(dampingRatio = 0.54f, stiffness = 720f),
+         label = "rowPress",
+     )
+     val rowBackground by animateColorAsState(
+diff --git a/app/src/main/java/com/lastwave/app/ui/search/SearchScreen.kt b/app/src/main/java/com/lastwave/app/ui/search/SearchScreen.kt
+index 970a6a6..b165bf6 100644
+--- a/app/src/main/java/com/lastwave/app/ui/search/SearchScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/search/SearchScreen.kt
+@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.width
+ import androidx.compose.foundation.layout.windowInsetsPadding
+ import androidx.compose.foundation.lazy.LazyColumn
+ import androidx.compose.foundation.lazy.items
++import androidx.compose.foundation.lazy.itemsIndexed
+ import androidx.compose.foundation.shape.CircleShape
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.foundation.text.KeyboardActions
+@@ -95,6 +96,7 @@ import com.lastwave.app.ui.common.safeDrawingBottomPadding
+ import com.lastwave.app.ui.common.safeHorizontalContentPadding
+ import com.lastwave.app.ui.common.adaptiveContentWidth
+ import com.lastwave.app.ui.player.LocalMiniPlayerScrollClearance
++import com.lastwave.app.ui.common.expressiveBounceClickable
+ 
+ import androidx.compose.foundation.background
+ 
+@@ -462,11 +464,14 @@ fun SearchScreen(
+                                         }
+                                     }
+ 
+-                                    items(
++                                    itemsIndexed(
+                                         if (state.tab == SearchTab.USERS) state.results else otherResults,
+-                                        key = { it.entityId ?: it.url.ifBlank { it.name + it.artist.orEmpty() } },
+-                                        contentType = { "search_result" },
+-                                    ) { item ->
++                                        // Index suffix: duplicate name+artist results
++                                        // (common from Last.fm) must not crash on a
++                                        // duplicate LazyColumn key.
++                                        key = { index, item -> "${item.entityId ?: item.url.ifBlank { item.name + item.artist.orEmpty() }}_$index" },
++                                        contentType = { _, _ -> "search_result" },
++                                    ) { _, item ->
+                                         val isItemPlaying = state.tab == SearchTab.TRACKS && playbackState.isPlaying &&
+                                             playbackState.current?.title.equals(item.name, ignoreCase = true) &&
+                                             (item.artist.isNullOrBlank() || playbackState.current?.artist.equals(item.artist, ignoreCase = true))
+@@ -687,7 +692,7 @@ private fun SuggestionRow(
+     Row(
+         modifier = Modifier
+             .fillMaxWidth()
+-            .clickable(onClick = onClick)
++            .expressiveBounceClickable(targetScale = 0.97f, onClick = onClick)
+             .padding(horizontal = 16.dp, vertical = 12.dp),
+         verticalAlignment = Alignment.CenterVertically,
+     ) {
+@@ -761,7 +766,7 @@ private fun RecentSearchRow(
+     Row(
+         modifier = Modifier
+             .fillMaxWidth()
+-            .clickable(onClick = onClick)
++            .expressiveBounceClickable(targetScale = 0.97f, onClick = onClick)
+             .padding(horizontal = 16.dp, vertical = 10.dp),
+         verticalAlignment = Alignment.CenterVertically,
+     ) {
+diff --git a/app/src/main/java/com/lastwave/app/ui/settings/DownloadsScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/DownloadsScreen.kt
+index 8504207..11b8542 100644
+--- a/app/src/main/java/com/lastwave/app/ui/settings/DownloadsScreen.kt
++++ b/app/src/main/java/com/lastwave/app/ui/settings/DownloadsScreen.kt
+@@ -1926,7 +1926,7 @@ private fun ArtistDetailView(
+                     contentPadding = PaddingValues(horizontal = 2.dp),
+                     modifier = Modifier.fillMaxWidth(),
+                 ) {
+-                    items(albums, key = { it.title }) { album ->
++                    items(albums, key = { "${it.artist}_${it.title}" }) { album ->
+                         Card(
+                             shape = RoundedCornerShape(16.dp),
+                             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt b/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt
-index 2d067590..aaff286e 100644
+index 2d06759..aaff286 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/settings/DownloadsViewModel.kt
 @@ -252,7 +252,7 @@ class DownloadsViewModel @Inject constructor(
@@ -819,7 +1580,7 @@ index 2d067590..aaff286e 100644
      fun describeCustomLocation(): String? =
          com.lastwave.app.data.download.SafTreeFiles.describeLocation(
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt
-index c40de2d2..c1d4d99b 100644
+index c40de2d..c1d4d99 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/settings/ExternalPlaylistImportScreen.kt
 @@ -136,7 +136,7 @@ fun ExternalPlaylistImportScreen(
@@ -832,7 +1593,7 @@ index c40de2d2..c1d4d99b 100644
                                  color = MaterialTheme.colorScheme.onSurfaceVariant,
                              )
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
-index 0f03515e..e9495c09 100644
+index 0f03515..943bb9f 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsScreen.kt
 @@ -32,9 +32,11 @@ import androidx.compose.ui.text.AnnotatedString
@@ -920,15 +1681,18 @@ index 0f03515e..e9495c09 100644
          icon = Icons.Filled.AutoAwesome,
      ),
  }
-@@ -418,7 +420,6 @@ fun SettingsScreen(
+@@ -418,9 +420,9 @@ fun SettingsScreen(
      onBack: () -> Unit = {},
      onLoggedOut: () -> Unit = {},
      onOpenDownloads: () -> Unit = {},
 -    onOpenModules: () -> Unit = {},
      onOpenHomeSections: () -> Unit = {},
      onOpenExcludedSongs: () -> Unit = {},
++    onOpenModules: () -> Unit = {},
      onOpenYouTubeImport: () -> Unit = {},
-@@ -482,6 +483,7 @@ fun SettingsScreen(
+     onOpenYouTubeLogin: () -> Unit = {},
+     onOpenExternalImport: () -> Unit = {},
+@@ -482,6 +484,7 @@ fun SettingsScreen(
      var showYtChannelSheet by remember { mutableStateOf(false) }
      var showYtDisconnectConfirm by remember { mutableStateOf(false) }
      var showLanguageDialog by remember { mutableStateOf(false) }
@@ -936,7 +1700,7 @@ index 0f03515e..e9495c09 100644
      val currentLanguage = remember(misc.appLanguageTag) { AppLanguage.fromTag(misc.appLanguageTag) }
  
      // Sends the user to Android's own Notification Listener access screen
-@@ -656,43 +658,6 @@ fun SettingsScreen(
+@@ -656,43 +659,6 @@ fun SettingsScreen(
              ) {
                  when (tab) {
                      null -> {
@@ -980,7 +1744,7 @@ index 0f03515e..e9495c09 100644
  
                          item {
                              Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-@@ -753,7 +718,7 @@ fun SettingsScreen(
+@@ -753,7 +719,7 @@ fun SettingsScreen(
                                              iconContainer = MaterialTheme.colorScheme.primaryContainer,
                                              iconTint = MaterialTheme.colorScheme.onPrimaryContainer,
                                              title = "About & System",
@@ -989,7 +1753,7 @@ index 0f03515e..e9495c09 100644
                                              onClick = { activeTab = SettingsTab.ABOUT },
                                              position = position,
                                          )
-@@ -1291,211 +1256,6 @@ fun SettingsScreen(
+@@ -1291,211 +1257,6 @@ fun SettingsScreen(
              }
                      }
  
@@ -1201,7 +1965,42 @@ index 0f03515e..e9495c09 100644
  
  
  
-@@ -1666,102 +1426,20 @@ fun SettingsScreen(
+@@ -1503,7 +1264,7 @@ fun SettingsScreen(
+                         item {
+                             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                                 SectionLabel("Home & Organization")
+-                                SettingsGroup(rowCount = 2) { index, position ->
++                                SettingsGroup(rowCount = 3) { index, position ->
+                                     when (index) {
+                                         0 -> SettingsActionCard(
+                                             icon = Icons.Filled.Dashboard,
+@@ -1519,7 +1280,7 @@ fun SettingsScreen(
+                                             position = position,
+                                             isHighlighted = (highlightedSettingId == "library.home_sections"),
+                                         )
+-                                        else -> SettingsActionCard(
++                                        1 -> SettingsActionCard(
+                                             icon = Icons.Filled.RestartAlt,
+                                             iconContainer = MaterialTheme.colorScheme.secondaryContainer,
+                                             iconTint = MaterialTheme.colorScheme.onSecondaryContainer,
+@@ -1529,6 +1290,16 @@ fun SettingsScreen(
+                                             position = position,
+                                             isHighlighted = (highlightedSettingId == "library.excluded_songs"),
+                                         )
++                                        else -> SettingsActionCard(
++                                            icon = Icons.Filled.Extension,
++                                            iconContainer = MaterialTheme.colorScheme.tertiaryContainer,
++                                            iconTint = MaterialTheme.colorScheme.onTertiaryContainer,
++                                            title = "Provider Modules & Addons",
++                                            subtitle = "Streaming addons and .lwp modules",
++                                            onClick = onOpenModules,
++                                            position = position,
++                                            isHighlighted = (highlightedSettingId == "library.modules"),
++                                        )
+                                     }
+                                 }
+                             }
+@@ -1666,102 +1437,20 @@ fun SettingsScreen(
                      SettingsGroup(rowCount = 1) { index, position ->
                          when (index) {
                              0 -> SettingsActionCard(
@@ -1311,7 +2110,7 @@ index 0f03515e..e9495c09 100644
                  }
              }
                      }
-@@ -1772,6 +1450,10 @@ fun SettingsScreen(
+@@ -1772,6 +1461,10 @@ fun SettingsScreen(
      }
      }
  
@@ -1322,7 +2121,7 @@ index 0f03515e..e9495c09 100644
      // -- Custom color wheel dialog (par 8.4) --
      if (state.showColorWheel) {
          ColorWheelSheet(onDismiss = viewModel::dismissColorWheel, onApply = viewModel::applyCustomColor)
-@@ -2388,8 +2070,8 @@ private fun appVersionName(context: android.content.Context): String = try {
+@@ -2388,8 +2081,8 @@ private fun appVersionName(context: android.content.Context): String = try {
  private fun rememberPressScale(interactionSource: MutableInteractionSource): Float {
      val pressed by interactionSource.collectIsPressedAsState()
      val scale by animateFloatAsState(
@@ -1333,7 +2132,7 @@ index 0f03515e..e9495c09 100644
          label = "pressScale",
      )
      return scale
-@@ -3537,31 +3219,16 @@ private fun AboutCard(versionName: String) {
+@@ -3537,31 +3230,16 @@ private fun AboutCard(versionName: String) {
              Modifier.fillMaxWidth().padding(vertical = 28.dp, horizontal = 20.dp),
              horizontalAlignment = Alignment.CenterHorizontally,
          ) {
@@ -1374,7 +2173,7 @@ index 0f03515e..e9495c09 100644
              Spacer(Modifier.height(8.dp))
              Surface(
                  shape = ExpressivePillShape,
-@@ -3577,46 +3244,188 @@ private fun AboutCard(versionName: String) {
+@@ -3577,46 +3255,188 @@ private fun AboutCard(versionName: String) {
              }
              Spacer(Modifier.height(12.dp))
              Text(
@@ -1581,7 +2380,28 @@ index 0f03515e..e9495c09 100644
          }
      }
  }
-@@ -4344,7 +4153,7 @@ private fun YouTubeChannelSheet(
+@@ -4012,7 +3832,19 @@ private fun EqualizerSheet(
+                     )
+                 }
+                 if (eq.presetName == EqualizerPresets.CUSTOM_NAME) {
+-                    FilterChip(selected = true, onClick = {}, label = { Text("Custom", style = MaterialTheme.typography.labelMedium) })
++                    // Selected-state indicator only — not a button. A plain
++                    // pill reads as "current preset" without a dead tap.
++                    Surface(
++                        shape = RoundedCornerShape(50),
++                        color = MaterialTheme.colorScheme.secondaryContainer,
++                    ) {
++                        Text(
++                            "Custom",
++                            style = MaterialTheme.typography.labelMedium,
++                            color = MaterialTheme.colorScheme.onSecondaryContainer,
++                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
++                        )
++                    }
+                 }
+             }
+ 
+@@ -4344,7 +4176,7 @@ private fun YouTubeChannelSheet(
                  Column(Modifier.weight(1f)) {
                      Text("YouTube Channel", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                      Text(
@@ -1590,7 +2410,7 @@ index 0f03515e..e9495c09 100644
                          style = MaterialTheme.typography.bodySmall,
                          color = MaterialTheme.colorScheme.onSurfaceVariant,
                      )
-@@ -4506,7 +4315,7 @@ private fun YouTubeLibraryVisibilitySheet(
+@@ -4506,7 +4338,7 @@ private fun YouTubeLibraryVisibilitySheet(
                  Column(Modifier.weight(1f)) {
                      Text("YouTube Playlists Shown", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                      Text(
@@ -1600,7 +2420,7 @@ index 0f03515e..e9495c09 100644
                          color = MaterialTheme.colorScheme.onSurfaceVariant,
                      )
 diff --git a/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt b/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
-index bd29df03..a564ad15 100644
+index bd29df0..a564ad1 100644
 --- a/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/settings/SettingsSearchIndex.kt
 @@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.Contrast
@@ -1834,7 +2654,7 @@ index bd29df03..a564ad15 100644
                      iconTint = { MaterialTheme.colorScheme.onPrimaryContainer },
                      parentTab = SettingsTab.ABOUT,
 diff --git a/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt b/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
-index 33b61633..9a36be9d 100644
+index 33b6163..163e410 100644
 --- a/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/shell/MainShell.kt
 @@ -48,6 +48,7 @@ import androidx.compose.material.icons.automirrored.filled.QueueMusic
@@ -1845,7 +2665,15 @@ index 33b61633..9a36be9d 100644
  import androidx.compose.material.icons.filled.Home
  import androidx.compose.material.icons.filled.Leaderboard
  import androidx.compose.material3.Icon
-@@ -159,6 +160,7 @@ private enum class MainTab(val labelRes: Int) {
+@@ -135,6 +136,7 @@ import com.lastwave.app.ui.theme.SquircleShape
+ import com.lastwave.app.ui.theme.rememberLayerBackdrop
+ import com.lastwave.app.ui.theme.isLiquidGlassBackdropSupported
+ import com.lastwave.app.ui.theme.liquidGlassSource
++import com.lastwave.app.ui.common.pressScale
+ import dagger.hilt.android.lifecycle.HiltViewModel
+ import kotlinx.coroutines.launch
+ import javax.inject.Inject
+@@ -159,6 +161,7 @@ private enum class MainTab(val labelRes: Int) {
      FEED(com.lastwave.app.R.string.nav_feed),
      STATS(com.lastwave.app.R.string.nav_stats),
      PLAYLISTS(com.lastwave.app.R.string.nav_playlists),
@@ -1853,7 +2681,7 @@ index 33b61633..9a36be9d 100644
  }
  
  /** Shared with any screen hosted inside [MainShell] so their scrolling
-@@ -267,6 +269,7 @@ fun MainShell(
+@@ -267,6 +270,7 @@ fun MainShell(
                          onOpenPlaylist = onOpenPlaylist,
                          onOpenSpotifyImport = onOpenSpotifyImport,
                      )
@@ -1861,14 +2689,37 @@ index 33b61633..9a36be9d 100644
                  }
              }
          }
-@@ -623,4 +626,5 @@ private fun MainTab.icon(): ImageVector = when (this) {
+@@ -521,6 +525,7 @@ private fun FloatingNavBar(
+                         tonalElevation = if (liquidGlass) 0.dp else 4.dp,
+                         modifier = Modifier
+                             .size(56.dp)
++                            .pressScale(fabInteraction, 0.9f)
+                             .liquidGlassChrome(CircleShape, liquidGlass, LiquidGlassPreset.FloatingControls, backdrop, interactionSource = fabInteraction)
+                             .clickable(interactionSource = fabInteraction, indication = null, onClick = onOpenGenerator),
+                     ) {
+@@ -569,11 +574,13 @@ private fun FloatingNavItem(
+         label = "navItemPadding",
+     )
+ 
++    val navInteractionSource = remember { MutableInteractionSource() }
+     Surface(
+         onClick = onClick,
++        interactionSource = navInteractionSource,
+         shape = PillShape,
+         color = backgroundColor,
+-        modifier = Modifier.height(48.dp),
++        modifier = Modifier.height(48.dp).pressScale(navInteractionSource, 0.92f),
+     ) {
+         Row(
+             verticalAlignment = Alignment.CenterVertically,
+@@ -623,4 +630,5 @@ private fun MainTab.icon(): ImageVector = when (this) {
      MainTab.FEED -> Icons.Filled.Home
      MainTab.STATS -> Icons.Filled.Leaderboard
      MainTab.PLAYLISTS -> Icons.AutoMirrored.Filled.QueueMusic
 +    MainTab.TOGETHER -> Icons.Filled.Group
  }
 diff --git a/app/src/main/java/com/lastwave/app/ui/theme/LiquidGlass.kt b/app/src/main/java/com/lastwave/app/ui/theme/LiquidGlass.kt
-index 9459b334..37eafb28 100644
+index 9459b33..37eafb2 100644
 --- a/app/src/main/java/com/lastwave/app/ui/theme/LiquidGlass.kt
 +++ b/app/src/main/java/com/lastwave/app/ui/theme/LiquidGlass.kt
 @@ -447,9 +447,9 @@ fun Modifier.drawInteractiveGlass(
@@ -1894,7 +2745,7 @@ index 9459b334..37eafb28 100644
  ): Modifier {
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/RoomRegistry.kt b/app/src/main/java/com/lastwave/app/ui/together/RoomRegistry.kt
 new file mode 100644
-index 00000000..c63eb423
+index 0000000..c63eb42
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/RoomRegistry.kt
 @@ -0,0 +1,167 @@
@@ -2067,10 +2918,10 @@ index 00000000..c63eb423
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
 new file mode 100644
-index 00000000..61e1ad7b
+index 0000000..c43e104
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherScreen.kt
-@@ -0,0 +1,779 @@
+@@ -0,0 +1,780 @@
 +package com.lastwave.app.ui.together
 +
 +import androidx.compose.animation.animateContentSize
@@ -2135,6 +2986,7 @@ index 00000000..61e1ad7b
 +import com.lastwave.app.ui.common.adaptiveContentWidth
 +import com.lastwave.app.ui.common.safeDrawingBottomPadding
 +import com.lastwave.app.ui.shell.FloatingNavDefaults
++import com.lastwave.app.ui.common.expressiveBounceClickable
 +import kotlinx.coroutines.delay
 +
 +private fun formatPosition(ms: Long): String {
@@ -2454,7 +3306,7 @@ index 00000000..61e1ad7b
 +                                        modifier = Modifier
 +                                            .fillMaxWidth()
 +                                            .clip(RoundedCornerShape(12.dp))
-+                                            .clickable { viewModel.playRoomPlaylistItem(item.videoId) }
++                                            .expressiveBounceClickable(targetScale = 0.97f) { viewModel.playRoomPlaylistItem(item.videoId) }
 +                                            .padding(horizontal = 8.dp, vertical = 8.dp),
 +                                    ) {
 +                                        Text(
@@ -2852,7 +3704,7 @@ index 00000000..61e1ad7b
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
 new file mode 100644
-index 00000000..b1314d67
+index 0000000..b1314d6
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherSyncEngine.kt
 @@ -0,0 +1,404 @@
@@ -3262,7 +4114,7 @@ index 00000000..b1314d67
 +}
 diff --git a/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
 new file mode 100644
-index 00000000..820a150f
+index 0000000..820a150
 --- /dev/null
 +++ b/app/src/main/java/com/lastwave/app/ui/together/TogetherViewModel.kt
 @@ -0,0 +1,988 @@
@@ -4856,7 +5708,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/app/src/main/res/values-ar/strings.xml b/app/src/main/res/values-ar/strings.xml
-index 52881bb7..99c319ea 100644
+index 52881bb..99c319e 100644
 --- a/app/src/main/res/values-ar/strings.xml
 +++ b/app/src/main/res/values-ar/strings.xml
 @@ -1,7 +1,7 @@
@@ -4898,7 +5750,7 @@ index 52881bb7..99c319ea 100644
      <string name="dialog_logout_text">ستبقى قوائمك وبياناتك المخزنة.</string>
      <string name="common_save">حفظ</string>
 diff --git a/app/src/main/res/values-de/strings.xml b/app/src/main/res/values-de/strings.xml
-index ad258de1..2c5f2853 100644
+index ad258de..2c5f285 100644
 --- a/app/src/main/res/values-de/strings.xml
 +++ b/app/src/main/res/values-de/strings.xml
 @@ -1,7 +1,7 @@
@@ -4940,7 +5792,7 @@ index ad258de1..2c5f2853 100644
      <string name="dialog_logout_text">Playlists und Cache bleiben erhalten.</string>
      <string name="common_save">Speichern</string>
 diff --git a/app/src/main/res/values-es/strings.xml b/app/src/main/res/values-es/strings.xml
-index 77b7e2a2..efc028dc 100644
+index 77b7e2a..efc028d 100644
 --- a/app/src/main/res/values-es/strings.xml
 +++ b/app/src/main/res/values-es/strings.xml
 @@ -1,7 +1,7 @@
@@ -4982,7 +5834,7 @@ index 77b7e2a2..efc028dc 100644
      <string name="dialog_logout_text">Tus listas y datos en caché se conservarán.</string>
      <string name="common_save">Guardar</string>
 diff --git a/app/src/main/res/values-fr/strings.xml b/app/src/main/res/values-fr/strings.xml
-index 24a43b92..ac910392 100644
+index 24a43b9..ac91039 100644
 --- a/app/src/main/res/values-fr/strings.xml
 +++ b/app/src/main/res/values-fr/strings.xml
 @@ -1,7 +1,7 @@
@@ -5024,7 +5876,7 @@ index 24a43b92..ac910392 100644
      <string name="dialog_logout_text">Vos playlists et données en cache seront conservées.</string>
      <string name="common_save">Enregistrer</string>
 diff --git a/app/src/main/res/values-hi/strings.xml b/app/src/main/res/values-hi/strings.xml
-index 437eac87..54b0e96d 100644
+index 437eac8..54b0e96 100644
 --- a/app/src/main/res/values-hi/strings.xml
 +++ b/app/src/main/res/values-hi/strings.xml
 @@ -1,7 +1,7 @@
@@ -5066,7 +5918,7 @@ index 437eac87..54b0e96d 100644
      <string name="dialog_logout_text">आपकी प्लेलिस्ट और कैश डेटा रखा जाएगा।</string>
      <string name="common_save">सहेजें</string>
 diff --git a/app/src/main/res/values-in/strings.xml b/app/src/main/res/values-in/strings.xml
-index 8dbd4940..b48fde4f 100644
+index 8dbd494..b48fde4 100644
 --- a/app/src/main/res/values-in/strings.xml
 +++ b/app/src/main/res/values-in/strings.xml
 @@ -1,7 +1,7 @@
@@ -5108,7 +5960,7 @@ index 8dbd4940..b48fde4f 100644
      <string name="dialog_logout_text">Playlist dan data cache Anda tetap disimpan.</string>
      <string name="common_save">Simpan</string>
 diff --git a/app/src/main/res/values-ja/strings.xml b/app/src/main/res/values-ja/strings.xml
-index 21c19815..2204e280 100644
+index 21c1981..2204e28 100644
 --- a/app/src/main/res/values-ja/strings.xml
 +++ b/app/src/main/res/values-ja/strings.xml
 @@ -1,7 +1,7 @@
@@ -5150,7 +6002,7 @@ index 21c19815..2204e280 100644
      <string name="dialog_logout_text">プレイリストとキャッシュデータは保持されます。</string>
      <string name="common_save">保存</string>
 diff --git a/app/src/main/res/values-ko/strings.xml b/app/src/main/res/values-ko/strings.xml
-index ad49f3fb..de3e8e23 100644
+index ad49f3f..de3e8e2 100644
 --- a/app/src/main/res/values-ko/strings.xml
 +++ b/app/src/main/res/values-ko/strings.xml
 @@ -1,7 +1,7 @@
@@ -5192,7 +6044,7 @@ index ad49f3fb..de3e8e23 100644
      <string name="dialog_logout_text">플레이리스트와 캐시 데이터는 유지됩니다.</string>
      <string name="common_save">저장</string>
 diff --git a/app/src/main/res/values-pt-rBR/strings.xml b/app/src/main/res/values-pt-rBR/strings.xml
-index fb097f49..6619d4fe 100644
+index fb097f4..6619d4f 100644
 --- a/app/src/main/res/values-pt-rBR/strings.xml
 +++ b/app/src/main/res/values-pt-rBR/strings.xml
 @@ -1,7 +1,7 @@
@@ -5234,7 +6086,7 @@ index fb097f49..6619d4fe 100644
      <string name="dialog_logout_text">Suas playlists e dados em cache serão mantidos.</string>
      <string name="common_save">Salvar</string>
 diff --git a/app/src/main/res/values-ru/strings.xml b/app/src/main/res/values-ru/strings.xml
-index 65062ac5..30f331db 100644
+index 65062ac..30f331d 100644
 --- a/app/src/main/res/values-ru/strings.xml
 +++ b/app/src/main/res/values-ru/strings.xml
 @@ -1,7 +1,7 @@
@@ -5276,7 +6128,7 @@ index 65062ac5..30f331db 100644
      <string name="dialog_logout_text">Ваши плейлисты и кэшированные данные сохранятся.</string>
      <string name="common_save">Сохранить</string>
 diff --git a/app/src/main/res/values-tr/strings.xml b/app/src/main/res/values-tr/strings.xml
-index 46de715e..e207506d 100644
+index 46de715..e207506 100644
 --- a/app/src/main/res/values-tr/strings.xml
 +++ b/app/src/main/res/values-tr/strings.xml
 @@ -1,7 +1,7 @@
@@ -5318,7 +6170,7 @@ index 46de715e..e207506d 100644
      <string name="dialog_logout_text">Listeleriniz ve önbelleğe alınmış verileriniz korunur.</string>
      <string name="common_save">Kaydet</string>
 diff --git a/app/src/main/res/values-zh-rCN/strings.xml b/app/src/main/res/values-zh-rCN/strings.xml
-index c3b76e1b..9ab7d23a 100644
+index c3b76e1..9ab7d23 100644
 --- a/app/src/main/res/values-zh-rCN/strings.xml
 +++ b/app/src/main/res/values-zh-rCN/strings.xml
 @@ -1,7 +1,7 @@
@@ -5360,7 +6212,7 @@ index c3b76e1b..9ab7d23a 100644
      <string name="dialog_logout_text">您的歌单和缓存数据将被保留。</string>
      <string name="common_save">保存</string>
 diff --git a/app/src/main/res/values/colors.xml b/app/src/main/res/values/colors.xml
-index 9462ba89..7a955167 100644
+index 9462ba8..7a95516 100644
 --- a/app/src/main/res/values/colors.xml
 +++ b/app/src/main/res/values/colors.xml
 @@ -8,5 +8,5 @@
@@ -5371,7 +6223,7 @@ index 9462ba89..7a955167 100644
 +    <color name="ic_launcher_background">#FF030214</color>
  </resources>
 diff --git a/app/src/main/res/values/strings.xml b/app/src/main/res/values/strings.xml
-index ef8ddcb3..e9b8bd62 100644
+index ef8ddcb..e9b8bd6 100644
 --- a/app/src/main/res/values/strings.xml
 +++ b/app/src/main/res/values/strings.xml
 @@ -1,9 +1,9 @@
